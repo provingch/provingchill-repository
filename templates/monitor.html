@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Monitor | ProvingChill</title>
+    <link rel="icon" type="image/png" href="{{ url_for('serve_media', filename='favicon.png') }}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Syne:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <style>
+      .monitor-shell {
+        display: grid;
+        gap: 1rem;
+        padding-bottom: 2.8rem;
+      }
+
+      .monitor-hero,
+      .monitor-card {
+        padding: 1.25rem;
+      }
+
+      .monitor-kicker {
+        margin: 0 0 0.5rem;
+        color: #d8deea;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .monitor-hero h1,
+      .monitor-card h2 {
+        margin: 0;
+      }
+
+      .monitor-hero p,
+      .monitor-card p {
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .monitor-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+      }
+
+      .monitor-metric {
+        display: grid;
+        gap: 0.35rem;
+      }
+
+      .monitor-metric strong {
+        font-family: "Syne", sans-serif;
+        font-size: clamp(1.8rem, 4vw, 2.4rem);
+      }
+
+      .monitor-metric span {
+        color: var(--muted);
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .monitor-card-grid {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 1rem;
+      }
+
+      .monitor-stack {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .monitor-feed,
+      .monitor-output {
+        margin-top: 0.9rem;
+        padding: 1rem;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(8, 11, 17, 0.76);
+      }
+
+      .monitor-feed {
+        display: grid;
+        gap: 0.7rem;
+        max-height: 28rem;
+        overflow-y: auto;
+      }
+
+      .monitor-event {
+        display: grid;
+        gap: 0.3rem;
+        padding-bottom: 0.7rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .monitor-event:last-child {
+        padding-bottom: 0;
+        border-bottom: 0;
+      }
+
+      .monitor-event time {
+        color: #f2f6ff;
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+
+      .monitor-event strong {
+        color: var(--cyan);
+      }
+
+      .monitor-event code,
+      .monitor-output pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .monitor-command-row {
+        display: flex;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+        margin-top: 0.9rem;
+      }
+
+      .monitor-command-row input {
+        flex: 1;
+        min-width: 14rem;
+      }
+
+      .monitor-empty {
+        color: var(--muted);
+        margin: 0;
+      }
+
+      @media (max-width: 920px) {
+        .monitor-grid,
+        .monitor-card-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body
+    data-authenticated="{{ '1' if auth_user else '0' }}"
+    data-username="{{ auth_user.username if auth_user else '' }}"
+    data-role="{{ auth_user.role if auth_user else '' }}"
+    data-page="monitor"
+  >
+    <div class="bg-noise" aria-hidden="true"></div>
+    <div class="bg-shape bg-shape-a" aria-hidden="true"></div>
+    <div class="bg-shape bg-shape-b" aria-hidden="true"></div>
+    {% set flash_messages = get_flashed_messages(with_categories=true) %}
+    {% set auth_jump_href = url_for('monitor_page') %}
+    {% set auth_jump_label = 'Ir a monitor' %}
+    {% set auth_return_path = request.path %}
+    {% include "_site_nav.html" %}
+
+    <main class="wrapper monitor-shell">
+      <section class="panel monitor-hero">
+        <p class="monitor-kicker">Lectura publica</p>
+        <h1>Monitor del proyecto</h1>
+        <p>
+          Esta vista muestra salud del backend, trafico de proyectos y eventos recientes del
+          monitor. Los comandos quedan reservados para la cuenta propietaria.
+        </p>
+      </section>
+
+      <section class="monitor-grid">
+        <article class="panel monitor-card">
+          <p class="monitor-kicker">Backend</p>
+          <div class="monitor-metric">
+            <strong id="monitor-health-value">...</strong>
+            <span id="monitor-health-label">Comprobando salud</span>
+          </div>
+        </article>
+
+        <article class="panel monitor-card">
+          <p class="monitor-kicker">Vistas de proyectos</p>
+          <div class="monitor-metric">
+            <strong id="monitor-views-value">0</strong>
+            <span id="monitor-views-label">Cargando trafico</span>
+          </div>
+        </article>
+
+        <article class="panel monitor-card">
+          <p class="monitor-kicker">Proyecto arriba</p>
+          <div class="monitor-metric">
+            <strong id="monitor-top-project">Sin datos</strong>
+            <span id="monitor-top-project-label">Esperando datos</span>
+          </div>
+        </article>
+      </section>
+
+      <section class="monitor-card-grid">
+        <article class="panel monitor-card">
+          <p class="monitor-kicker">Eventos recientes</p>
+          <h2>Actividad del monitor</h2>
+          <div id="monitor-events" class="monitor-feed">
+            <p class="monitor-empty">Cargando eventos...</p>
+          </div>
+        </article>
+
+        <div class="monitor-stack">
+          <article class="panel monitor-card">
+            <p class="monitor-kicker">Origenes</p>
+            <h2>Ultimo resumen</h2>
+            <div id="monitor-sources" class="monitor-feed">
+              <p class="monitor-empty">Cargando origenes...</p>
+            </div>
+          </article>
+
+          {% if can_execute_monitor_commands %}
+          <article class="panel monitor-card">
+            <p class="monitor-kicker">Owner</p>
+            <h2>Comandos del monitor</h2>
+            <div class="monitor-command-row">
+              <input id="monitor-command-input" type="text" placeholder="Ej: /status, /events recent 5" />
+              <button id="monitor-command-submit" type="button">Ejecutar</button>
+            </div>
+            <div id="monitor-command-output" class="monitor-output" hidden>
+              <pre id="monitor-command-result"></pre>
+            </div>
+          </article>
+          {% endif %}
+        </div>
+      </section>
+    </main>
+
+    <script>
+      async function fetchJson(url, options = {}) {
+        const response = await fetch(url, {
+          cache: "no-store",
+          headers: {
+            Accept: "application/json",
+            ...(options.headers || {}),
+          },
+          ...options,
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload?.error || `No pude cargar ${url}`);
+        }
+        return payload;
+      }
+
+      function setText(id, value) {
+        const node = document.getElementById(id);
+        if (node) {
+          node.textContent = value;
+        }
+      }
+
+      function formatCount(value) {
+        const parsed = Number(value || 0);
+        return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)).toLocaleString("es-ES") : "0";
+      }
+
+      function renderEvents(events = []) {
+        const node = document.getElementById("monitor-events");
+        if (!node) {
+          return;
+        }
+
+        node.innerHTML = "";
+        if (!events.length) {
+          node.innerHTML = '<p class="monitor-empty">Todavia no hay eventos recientes.</p>';
+          return;
+        }
+
+        events.slice().reverse().forEach((event) => {
+          const item = document.createElement("article");
+          item.className = "monitor-event";
+
+          const time = document.createElement("time");
+          time.textContent = event.timestamp || "Sin hora";
+
+          const type = document.createElement("strong");
+          type.textContent = event.type || "unknown";
+
+          const details = document.createElement("code");
+          details.textContent = JSON.stringify(event.details || {}, null, 2);
+
+          item.append(time, type, details);
+          node.appendChild(item);
+        });
+      }
+
+      function renderSources(bySource = {}) {
+        const node = document.getElementById("monitor-sources");
+        if (!node) {
+          return;
+        }
+
+        node.innerHTML = "";
+        const entries = Object.entries(bySource || {}).sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0));
+        if (!entries.length) {
+          node.innerHTML = '<p class="monitor-empty">Todavia no hay visitas a proyectos en el rango actual.</p>';
+          return;
+        }
+
+        entries.forEach(([source, total]) => {
+          const item = document.createElement("article");
+          item.className = "monitor-event";
+
+          const label = document.createElement("strong");
+          label.textContent = source;
+
+          const value = document.createElement("code");
+          value.textContent = `${formatCount(total)} visitas`;
+
+          item.append(label, value);
+          node.appendChild(item);
+        });
+      }
+
+      async function loadHealth() {
+        try {
+          const payload = await fetchJson("/health");
+          setText("monitor-health-value", "OK");
+          setText("monitor-health-label", `Instancia ${payload.instance_id || "?"}`);
+        } catch (error) {
+          setText("monitor-health-value", "CAIDO");
+          setText("monitor-health-label", error?.message || "Sin respuesta");
+        }
+      }
+
+      async function loadTraffic() {
+        try {
+          const payload = await fetchJson("/api/visits");
+          setText("monitor-views-value", formatCount(payload.total));
+          setText("monitor-views-label", "Vistas de proyectos en los ultimos 10 dias");
+          setText("monitor-top-project", payload?.top_project?.label || "Sin datos");
+          setText(
+            "monitor-top-project-label",
+            payload?.top_project?.count ? `${formatCount(payload.top_project.count)} vistas` : "Esperando datos"
+          );
+          renderSources(payload.by_source || {});
+        } catch (error) {
+          setText("monitor-views-label", error?.message || "No pude cargar trafico");
+          renderSources({});
+        }
+      }
+
+      async function loadEvents() {
+        try {
+          const payload = await fetchJson("/api/monitor/events");
+          renderEvents(Array.isArray(payload.events) ? payload.events : []);
+        } catch (error) {
+          renderEvents([]);
+        }
+      }
+
+      async function runCommand() {
+        const input = document.getElementById("monitor-command-input");
+        const output = document.getElementById("monitor-command-output");
+        const result = document.getElementById("monitor-command-result");
+        if (!input || !output || !result) {
+          return;
+        }
+
+        const command = input.value.trim();
+        if (!command) {
+          return;
+        }
+
+        try {
+          const payload = await fetchJson("/api/monitor/command", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ command }),
+          });
+          output.hidden = false;
+          result.textContent = JSON.stringify(payload, null, 2);
+        } catch (error) {
+          output.hidden = false;
+          result.textContent = error?.message || "No pude ejecutar el comando.";
+        }
+      }
+
+      async function refreshMonitor() {
+        await Promise.allSettled([loadHealth(), loadTraffic(), loadEvents()]);
+      }
+
+      document.getElementById("monitor-command-submit")?.addEventListener("click", runCommand);
+      document.getElementById("monitor-command-input")?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          runCommand();
+        }
+      });
+
+      refreshMonitor();
+      window.setInterval(refreshMonitor, 15000);
+    </script>
+  </body>
+</html>

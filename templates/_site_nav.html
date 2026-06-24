@@ -1,0 +1,297 @@
+{% set is_home_page = request.endpoint == "home" %}
+{% set is_projects_page = request.endpoint == "projects_page" %}
+{% set is_monitor_page = request.endpoint == "monitor_page" %}
+<div class="wrapper site-nav-wrap">
+  <nav class="site-nav panel" aria-label="Navegacion principal">
+    <div class="site-nav-links">
+      <a
+        class="site-nav-link{% if is_home_page %} is-active{% endif %}"
+        href="{{ '#inicio' if is_home_page else url_for('home', _anchor='inicio') }}"
+        data-nav-link="inicio"
+      >
+        Inicio
+      </a>
+      <a
+        class="site-nav-link{% if is_projects_page %} is-active{% endif %}"
+        href="{{ '#proyectos' if is_projects_page else url_for('projects_page') }}"
+        data-nav-link="proyectos"
+      >
+        Proyectos
+      </a>
+      <a
+        class="site-nav-link{% if is_monitor_page %} is-active{% endif %}"
+        href="{{ url_for('monitor_page') }}"
+        {% if is_monitor_page %}aria-current="page"{% endif %}
+      >
+        Monitor
+      </a>
+    </div>
+
+    <div class="site-nav-actions">
+      <details class="auth-fab site-nav-user" id="login" {% if flash_messages %}open{% endif %}>
+        <summary
+          class="auth-fab-toggle"
+          aria-label="{{ ('Sesion de ' ~ auth_user.username) if auth_user else 'Abrir acceso' }}"
+        >
+          {% if auth_user %}
+          <span class="auth-fab-avatar{% if auth_user.avatar_url %} has-image{% endif %}" aria-hidden="true">
+            {% if auth_user.avatar_url %}
+            <img src="{{ auth_user.avatar_url }}" alt="" />
+            {% else %}
+            <span>{{ auth_user.username[:1]|upper }}</span>
+            {% endif %}
+          </span>
+          {% else %}
+          <span class="auth-fab-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+              <path
+                d="M12 12.25a4.25 4.25 0 1 0-4.25-4.25A4.25 4.25 0 0 0 12 12.25Zm0 2c-4.16 0-7.5 2.22-7.5 4.97 0 .43.35.78.78.78h13.44c.43 0 .78-.35.78-.78 0-2.75-3.34-4.97-7.5-4.97Z"
+              />
+            </svg>
+          </span>
+          {% endif %}
+          <span class="sr-only">{{ auth_user.username if auth_user else "Abrir acceso" }}</span>
+          {% if auth_user %}
+          <span class="auth-fab-dot" aria-hidden="true"></span>
+          {% endif %}
+        </summary>
+
+        <div class="auth-fab-panel">
+          {% if flash_messages %}
+          <div class="flash-stack" aria-live="polite">
+            {% for category, message in flash_messages %}
+            <p class="flash-message {{ category }}">{{ message }}</p>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          {% if auth_user %}
+          <div class="auth-user-card">
+            <div class="auth-user-head">
+              <div class="auth-user-identity">
+                <div class="avatar-shell avatar-shell-sm{% if auth_user.avatar_url %} has-image{% endif %}">
+                  {% if auth_user.avatar_url %}
+                  <img src="{{ auth_user.avatar_url }}" alt="Foto de {{ auth_user.username }}" />
+                  {% else %}
+                  <span>{{ auth_user.username[:1]|upper }}</span>
+                  {% endif %}
+                </div>
+                <div>
+                  <strong>{{ auth_user.username }}</strong>
+                  <p class="auth-role-line">
+                    Rol
+                    <span class="role-pill {{ auth_user.role }}">{{ auth_user.role }}</span>
+                  </p>
+                </div>
+              </div>
+              <div class="auth-quick-actions">
+                <a class="btn btn-ghost auth-jump" href="{{ auth_jump_href|default(url_for('projects_page')) }}">
+                  {{ auth_jump_label|default('Ir a proyectos') }}
+                </a>
+              </div>
+            </div>
+            <form method="post" action="{{ url_for('logout') }}" class="auth-form-inline">
+              <input
+                type="hidden"
+                name="next_path"
+                value="{{ auth_return_path|default(request.path) }}"
+              />
+              <button type="submit">Cerrar sesion</button>
+            </form>
+          </div>
+          <div class="auth-account-panel">
+            <article class="account-summary account-summary-compact">
+              <div
+                id="account-avatar-preview"
+                class="avatar-shell avatar-shell-xl{% if auth_user.avatar_url %} has-image{% endif %}"
+                data-fallback="{{ auth_user.username[:1]|upper }}"
+              >
+                {% if auth_user.avatar_url %}
+                <img src="{{ auth_user.avatar_url }}" alt="Foto de {{ auth_user.username }}" />
+                {% else %}
+                <span>{{ auth_user.username[:1]|upper }}</span>
+                {% endif %}
+              </div>
+
+              <div class="account-summary-copy">
+                <strong id="account-name-preview">{{ auth_user.username }}</strong>
+                <p class="auth-role-line">
+                  Rol
+                  <span class="role-pill {{ auth_user.role }}">{{ auth_user.role }}</span>
+                </p>
+                <p class="account-summary-text">
+                  Cambia tu nombre, tu foto y tu contraseña desde este menú.
+                </p>
+              </div>
+            </article>
+
+            <form
+              method="post"
+              action="{{ url_for('update_account_profile_route') }}"
+              enctype="multipart/form-data"
+              class="account-form account-form-compact"
+            >
+              <input
+                type="hidden"
+                name="next_path"
+                value="{{ auth_return_path|default(request.path) }}"
+              />
+              <label class="field" for="profile-username">
+                <span>Nombre de usuario</span>
+                <input
+                  id="profile-username"
+                  name="profile_username"
+                  type="text"
+                  value="{{ auth_user.username }}"
+                  maxlength="40"
+                  pattern="[A-Za-z0-9._-]{3,40}"
+                  required
+                />
+              </label>
+
+              <div class="account-form-grid">
+                <label class="field" for="profile-password">
+                  <span>Nueva contraseña</span>
+                  <input
+                    id="profile-password"
+                    name="profile_password"
+                    type="password"
+                    autocomplete="new-password"
+                    minlength="8"
+                    placeholder="Solo si quieres cambiarla"
+                  />
+                </label>
+                <label class="field" for="profile-password-confirm">
+                  <span>Confirmar contraseña</span>
+                  <input
+                    id="profile-password-confirm"
+                    name="profile_password_confirm"
+                    type="password"
+                    autocomplete="new-password"
+                    minlength="8"
+                    placeholder="Repite la nueva contraseña"
+                  />
+                </label>
+              </div>
+
+              <label class="field" for="profile-avatar">
+                <span>Foto de perfil</span>
+                <input
+                  id="profile-avatar"
+                  name="profile_avatar"
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                />
+              </label>
+
+              {% if auth_user.avatar_url %}
+              <label class="check-field" for="profile-avatar-remove">
+                <input
+                  id="profile-avatar-remove"
+                  name="profile_avatar_remove"
+                  type="checkbox"
+                  value="1"
+                />
+                <span>Quitar la foto actual</span>
+              </label>
+              {% endif %}
+
+              <div class="account-form-footer">
+                <p class="account-form-hint">PNG, JPG o WEBP. Maximo 4 MB.</p>
+                <button type="submit">Guardar cambios</button>
+              </div>
+            </form>
+          </div>
+          {% else %}
+          <div class="auth-panel-copy">
+            <p class="auth-panel-kicker">Acceso</p>
+            <h2>Cuentas del portal</h2>
+          <p>
+            Crea tu cuenta para dejar likes en proyectos, personalizar tu perfil y guardar tu foto.
+          </p>
+        </div>
+
+          <div class="auth-columns">
+            <form method="post" action="{{ url_for('register') }}" class="auth-form">
+              <input
+                type="hidden"
+                name="next_path"
+                value="{{ auth_return_path|default(request.path) }}"
+              />
+              <h3>Crear cuenta</h3>
+              <label class="field" for="register-username">
+                <span>Usuario</span>
+                <input
+                  id="register-username"
+                  name="register_username"
+                  type="text"
+                  autocomplete="username"
+                  maxlength="40"
+                  pattern="[A-Za-z0-9._-]{3,40}"
+                  required
+                />
+              </label>
+              <label class="field" for="register-password">
+                <span>Contraseña</span>
+                <input
+                  id="register-password"
+                  name="register_password"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="8"
+                  required
+                />
+              </label>
+              <label class="field" for="register-password-confirm">
+                <span>Confirmar</span>
+                <input
+                  id="register-password-confirm"
+                  name="register_password_confirm"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="8"
+                  required
+                />
+              </label>
+              <button type="submit" class="btn auth-submit">Registrarme</button>
+            </form>
+
+            <form method="post" action="{{ url_for('login') }}" class="auth-form auth-form-muted">
+              <input
+                type="hidden"
+                name="next_path"
+                value="{{ auth_return_path|default(request.path) }}"
+              />
+              <h3>Entrar</h3>
+              <label class="field" for="username">
+                <span>Usuario</span>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  autocomplete="username"
+                  maxlength="40"
+                  pattern="[A-Za-z0-9._-]{3,40}"
+                  required
+                />
+              </label>
+              <label class="field" for="password">
+                <span>Contraseña</span>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autocomplete="current-password"
+                  minlength="8"
+                  required
+                />
+              </label>
+              <button type="submit" class="btn auth-submit">Iniciar sesion</button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </details>
+    </div>
+  </nav>
+</div>

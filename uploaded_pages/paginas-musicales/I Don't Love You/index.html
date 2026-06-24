@@ -1,0 +1,2311 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>I Don't Love You - My Chemical Romance</title>
+    <link rel="icon" type="image/png" href="media/favicon.png">
+    <style>
+      @font-face {
+        font-family: "Human Intention";
+        src: url("./media/Human%20Intention.otf") format("opentype");
+        font-display: swap;
+      }
+
+      :root {
+        color-scheme: dark;
+        --ink: #f4ead7;
+        --muted: #b6b0a4;
+        --accent: #f1d9b3;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        background: #000;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+        color: var(--ink);
+        font-family: "Arial Black", "Impact", sans-serif;
+        min-height: 100vh;
+      }
+
+      .scene {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background: #000;
+      }
+
+      #scene-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .stage {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.2rem;
+        width: 100%;
+        padding: 1.2rem;
+        text-align: center;
+      }
+
+      .sequence-started .stage {
+        justify-content: flex-end;
+        padding-bottom: clamp(30px, 8vh, 92px);
+      }
+
+      .button-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.8rem;
+        width: 100%;
+      }
+
+      .lyric {
+        margin: 0;
+        min-height: 1.1em;
+        width: min(92vw, 980px);
+        max-width: min(92vw, 980px);
+        font-family: "Human Intention", "Impact", "Haettenschweiler", "Arial Black", sans-serif;
+        font-size: clamp(1.75rem, 4.8vw, 3.6rem);
+        font-weight: 900;
+        line-height: 0.98;
+        letter-spacing: 0.02em;
+        color: #ffffff;
+        text-align: center;
+        align-self: center;
+        padding: 0;
+        text-wrap: balance;
+        word-break: normal;
+        text-transform: none;
+        -webkit-text-stroke: 1.8px #111;
+        paint-order: stroke fill;
+        text-shadow:
+          0 3px 0 #111,
+          0 6px 0 rgba(17, 17, 17, 0.72),
+          0 12px 22px rgba(0, 0, 0, 0.34);
+      }
+
+      .lyric.is-empty {
+        opacity: 0;
+      }
+
+      .start-btn {
+        font: inherit;
+        font-size: 0.95rem;
+        border: 1px solid #454545;
+        background: #111;
+        color: #fff;
+        padding: 10px 18px;
+        border-radius: 6px;
+        touch-action: manipulation;
+        cursor: pointer;
+      }
+
+      .start-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .button-status {
+        margin: 0;
+        min-height: 1rem;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.9rem;
+        color: #d0d0d0;
+        text-align: center;
+        text-shadow: 0 0 10px rgba(0, 0, 0, 0.72);
+      }
+
+      .sequence-started .button-container,
+      .sequence-started #status {
+        display: none !important;
+      }
+
+      audio {
+        display: none;
+      }
+
+      .black-overlay {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        z-index: 1;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: none;
+      }
+
+      .overlay-hidden .black-overlay {
+        opacity: 0;
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="black-overlay" id="black-overlay"></div>
+    <div class="scene" aria-hidden="true">
+      <canvas id="scene-canvas"></canvas>
+    </div>
+
+    <main class="stage">
+      <div class="button-container">
+        <button id="start-btn" class="start-btn" disabled>Comenzar secuencia</button>
+      </div>
+      <p id="lyric" class="lyric is-empty"></p>
+      <p id="status" class="button-status">Cargando timestamps...</p>
+      <audio id="audio" preload="auto" src="media/I%20Don't%20Love%20You.mp3">
+        Tu navegador no soporta audio HTML5.
+      </audio>
+    </main>
+
+    <script>
+      const sceneCanvas = document.getElementById("scene-canvas");
+      const sceneCtx = sceneCanvas ? sceneCanvas.getContext("2d") : null;
+      const overlay = document.getElementById("black-overlay");
+      const audio = document.getElementById("audio");
+      const startBtn = document.getElementById("start-btn");
+      const lyricEl = document.getElementById("lyric");
+      const statusText = document.getElementById("status");
+      const queryParams = new URLSearchParams(window.location.search);
+      const previewSceneOnly = queryParams.get("previewScene") === "1";
+      const previewTimeValue = Number(queryParams.get("previewTime"));
+      const figureSprites = {
+        woman: new Image(),
+        man: new Image()
+      };
+
+      figureSprites.woman.decoding = "async";
+      figureSprites.man.decoding = "async";
+      figureSprites.woman.src = "media/mujer.png";
+      figureSprites.man.src = "media/hombre.png";
+
+      Object.values(figureSprites).forEach((image) => {
+        image.addEventListener("load", () => {
+          if (sceneCtx) {
+            drawScene();
+          }
+        });
+      });
+
+      const LRC_PATH = "media/lyrics.lrc";
+      const TREE_SEED = 240326;
+      const LEAF_SEED = 910247;
+      const MIST_SEED = 771903;
+      const RAIN_SEED = 508117;
+      const GROUND_THING_SEED = 318405;
+      const SCENE_EFFECT_TIMINGS = {
+        windIntroStart: 51.28,
+        windStormStart: 73.85,
+        calmStart: 94.32,
+        redRainStart: 119.03,
+        redRainDotsStart: 164.44,
+        calmAgainStart: 186.77,
+        finalStormStart: 203.77,
+        darkenStart: 219.96,
+        fullDarkAt: 229.62,
+        lightningStrikes: [73.85, 141.61, 164.44, 203.77, 215.18, 216.52, 217.84]
+      };
+      const CLOUD_PUFFS = [
+        { ox: -0.36, oy: 0.07, rx: 0.18, ry: 0.28 },
+        { ox: -0.18, oy: -0.02, rx: 0.22, ry: 0.32 },
+        { ox: 0.04, oy: -0.07, rx: 0.24, ry: 0.34 },
+        { ox: 0.24, oy: 0.02, rx: 0.22, ry: 0.3 },
+        { ox: 0.4, oy: 0.11, rx: 0.16, ry: 0.24 }
+      ];
+      const CLOUD_TEMPLATES = [
+        { baseX: -0.2, baseY: 0.14, widthRatio: 0.35, heightRatio: 0.12, speed: 0.004, opacity: 0.18, shade: 236, startOffset: 0.04 },
+        { baseX: 0.08, baseY: 0.09, widthRatio: 0.28, heightRatio: 0.1, speed: 0.0032, opacity: 0.15, shade: 244, startOffset: -0.02 },
+        { baseX: 0.34, baseY: 0.19, widthRatio: 0.31, heightRatio: 0.11, speed: -0.0024, opacity: 0.2, shade: 224, startOffset: 0.01 },
+        { baseX: 0.56, baseY: 0.11, widthRatio: 0.26, heightRatio: 0.09, speed: 0.0028, opacity: 0.16, shade: 239, startOffset: 0 },
+        { baseX: 0.78, baseY: 0.2, widthRatio: 0.34, heightRatio: 0.12, speed: -0.002, opacity: 0.22, shade: 215, startOffset: 0.03 },
+        { baseX: 1.02, baseY: 0.13, widthRatio: 0.24, heightRatio: 0.08, speed: -0.0034, opacity: 0.16, shade: 233, startOffset: -0.01 }
+      ];
+      const PRIMARY_BRANCH_PLANS = [
+        { nodeIndex: 1, angle: -1.52, axis: "height", length: 0.24, widthScale: 0.5, depth: 4, spread: 0.9 },
+        { nodeIndex: 2, angle: -2.02, axis: "width", length: 0.34, widthScale: 0.6, depth: 3, spread: 0.78 },
+        { nodeIndex: 2, angle: -1.02, axis: "width", length: 0.33, widthScale: 0.68, depth: 4, spread: 0.84 },
+        { nodeIndex: 2, angle: -1.3, axis: "height", length: 0.2, widthScale: 0.62, depth: 4, spread: 0.9 },
+        { nodeIndex: 2, angle: -1.52, axis: "height", length: 0.26, widthScale: 0.54, depth: 4, spread: 0.9 },
+        { nodeIndex: 3, angle: -1.9, axis: "width", length: 0.3, widthScale: 0.48, depth: 3, spread: 0.76 },
+        { nodeIndex: 4, angle: -2.42, axis: "width", length: 0.33, widthScale: 0.54, depth: 4, spread: 0.66 },
+        { nodeIndex: 3, angle: -1.2, axis: "width", length: 0.28, widthScale: 0.56, depth: 3, spread: 0.82 },
+        { nodeIndex: 3, angle: -0.84, axis: "height", length: 0.25, widthScale: 0.58, depth: 4, spread: 0.9 },
+        { nodeIndex: 3, angle: -1.42, axis: "height", length: 0.3, widthScale: 0.5, depth: 4, spread: 0.88 },
+        { nodeIndex: 3, angle: -0.62, axis: "width", length: 0.31, widthScale: 0.62, depth: 4, spread: 0.72 },
+        { nodeIndex: 3, angle: -0.34, axis: "width", length: 0.22, widthScale: 0.44, depth: 3, spread: 0.68 },
+        { nodeIndex: 4, angle: -1.76, axis: "width", length: 0.26, widthScale: 0.4, depth: 3, spread: 0.78 },
+        { nodeIndex: 5, angle: -2.48, axis: "width", length: 0.35, widthScale: 0.48, depth: 3, spread: 0.62 },
+        { nodeIndex: 4, angle: -1.08, axis: "height", length: 0.2, widthScale: 0.44, depth: 3, spread: 0.88 },
+        { nodeIndex: 4, angle: -1.36, axis: "height", length: 0.26, widthScale: 0.42, depth: 4, spread: 0.88 },
+        { nodeIndex: 5, angle: -2.06, axis: "width", length: 0.22, widthScale: 0.28, depth: 2, spread: 0.68 },
+        { nodeIndex: 4, angle: -0.98, axis: "height", length: 0.17, widthScale: 0.34, depth: 3, spread: 0.78 },
+        { nodeIndex: 4, angle: -0.56, axis: "width", length: 0.37, widthScale: 0.56, depth: 4, spread: 0.68 },
+        { nodeIndex: 4, angle: -0.26, axis: "width", length: 0.2, widthScale: 0.38, depth: 3, spread: 0.64 },
+        { nodeIndex: 5, angle: -1.94, axis: "width", length: 0.26, widthScale: 0.38, depth: 3, spread: 0.8 },
+        { nodeIndex: 6, angle: -2.22, axis: "width", length: 0.25, widthScale: 0.28, depth: 2, spread: 0.64 },
+        { nodeIndex: 5, angle: -1.18, axis: "width", length: 0.2, widthScale: 0.38, depth: 3, spread: 0.8 },
+        { nodeIndex: 5, angle: -0.84, axis: "width", length: 0.31, widthScale: 0.38, depth: 3, spread: 0.72 },
+        { nodeIndex: 5, angle: -0.96, axis: "height", length: 0.18, widthScale: 0.36, depth: 3, spread: 0.88 },
+        { nodeIndex: 5, angle: -1.28, axis: "height", length: 0.24, widthScale: 0.34, depth: 4, spread: 0.86 },
+        { nodeIndex: 5, angle: -1.62, axis: "height", length: 0.16, widthScale: 0.28, depth: 3, spread: 0.8 },
+        { nodeIndex: 6, angle: -2.14, axis: "width", length: 0.14, widthScale: 0.22, depth: 2, spread: 0.72 },
+        { nodeIndex: 6, angle: -1.58, axis: "height", length: 0.16, widthScale: 0.24, depth: 3, spread: 0.76 },
+        { nodeIndex: 6, angle: -1.1, axis: "width", length: 0.17, widthScale: 0.22, depth: 2, spread: 0.72 },
+        { nodeIndex: 6, angle: -0.9, axis: "width", length: 0.31, widthScale: 0.28, depth: 3, spread: 0.76 },
+        { nodeIndex: 7, angle: -1.82, axis: "height", length: 0.1, widthScale: 0.16, depth: 2, spread: 0.66 },
+        { nodeIndex: 7, angle: -1.54, axis: "height", length: 0.12, widthScale: 0.16, depth: 2, spread: 0.66 },
+        { nodeIndex: 7, angle: -1.94, axis: "height", length: 0.08, widthScale: 0.12, depth: 1, spread: 0.58 }
+      ];
+      const DESKTOP_BRANCH_PLANS = [
+        { nodeIndex: 1, angle: -1.46, axis: "height", length: 0.24, widthScale: 0.44, depth: 4, spread: 0.88 },
+        { nodeIndex: 2, angle: -1.98, axis: "width", length: 0.22, widthScale: 0.5, depth: 4, spread: 0.82 },
+        { nodeIndex: 2, angle: -1.16, axis: "width", length: 0.22, widthScale: 0.5, depth: 4, spread: 0.82 },
+        { nodeIndex: 2, angle: -1.22, axis: "height", length: 0.22, widthScale: 0.54, depth: 4, spread: 0.88 },
+        { nodeIndex: 2, angle: -1.5, axis: "height", length: 0.28, widthScale: 0.46, depth: 4, spread: 0.88 },
+        { nodeIndex: 3, angle: -1.68, axis: "width", length: 0.26, widthScale: 0.54, depth: 4, spread: 0.8 },
+        { nodeIndex: 3, angle: -2.7, axis: "width", length: 0.24, widthScale: 0.52, depth: 3, spread: 0.72 },
+        { nodeIndex: 3, angle: -1.46, axis: "width", length: 0.26, widthScale: 0.54, depth: 4, spread: 0.8 },
+        { nodeIndex: 3, angle: -0.78, axis: "height", length: 0.26, widthScale: 0.52, depth: 4, spread: 0.86 },
+        { nodeIndex: 3, angle: -1.36, axis: "height", length: 0.3, widthScale: 0.46, depth: 4, spread: 0.86 },
+        { nodeIndex: 3, angle: -0.44, axis: "width", length: 0.24, widthScale: 0.52, depth: 3, spread: 0.72 },
+        { nodeIndex: 3, angle: -0.3, axis: "width", length: 0.18, widthScale: 0.38, depth: 3, spread: 0.68 },
+        { nodeIndex: 4, angle: -1.54, axis: "width", length: 0.2, widthScale: 0.42, depth: 3, spread: 0.8 },
+        { nodeIndex: 4, angle: -2.74, axis: "width", length: 0.28, widthScale: 0.48, depth: 4, spread: 0.68 },
+        { nodeIndex: 4, angle: -1.02, axis: "height", length: 0.2, widthScale: 0.4, depth: 3, spread: 0.84 },
+        { nodeIndex: 4, angle: -1.32, axis: "height", length: 0.26, widthScale: 0.38, depth: 4, spread: 0.84 },
+        { nodeIndex: 4, angle: -2.16, axis: "width", length: 0.16, widthScale: 0.3, depth: 3, spread: 0.72 },
+        { nodeIndex: 4, angle: -0.96, axis: "height", length: 0.14, widthScale: 0.28, depth: 3, spread: 0.76 },
+        { nodeIndex: 4, angle: -0.4, axis: "width", length: 0.28, widthScale: 0.48, depth: 4, spread: 0.68 },
+        { nodeIndex: 4, angle: -0.24, axis: "width", length: 0.16, widthScale: 0.34, depth: 3, spread: 0.64 },
+        { nodeIndex: 5, angle: -1.86, axis: "width", length: 0.16, widthScale: 0.34, depth: 3, spread: 0.8 },
+        { nodeIndex: 5, angle: -2.46, axis: "width", length: 0.22, widthScale: 0.34, depth: 3, spread: 0.7 },
+        { nodeIndex: 5, angle: -1.28, axis: "width", length: 0.16, widthScale: 0.34, depth: 3, spread: 0.8 },
+        { nodeIndex: 5, angle: -0.68, axis: "width", length: 0.22, widthScale: 0.34, depth: 3, spread: 0.7 },
+        { nodeIndex: 5, angle: -0.9, axis: "height", length: 0.16, widthScale: 0.32, depth: 3, spread: 0.84 },
+        { nodeIndex: 5, angle: -1.22, axis: "height", length: 0.22, widthScale: 0.3, depth: 4, spread: 0.84 },
+        { nodeIndex: 5, angle: -1.56, axis: "height", length: 0.14, widthScale: 0.24, depth: 3, spread: 0.78 },
+        { nodeIndex: 6, angle: -2.08, axis: "width", length: 0.12, widthScale: 0.18, depth: 2, spread: 0.68 },
+        { nodeIndex: 6, angle: -1.56, axis: "height", length: 0.12, widthScale: 0.2, depth: 3, spread: 0.72 },
+        { nodeIndex: 6, angle: -1.06, axis: "width", length: 0.12, widthScale: 0.18, depth: 2, spread: 0.68 },
+        { nodeIndex: 6, angle: -0.74, axis: "width", length: 0.2, widthScale: 0.2, depth: 2, spread: 0.68 },
+        { nodeIndex: 7, angle: -1.8, axis: "height", length: 0.08, widthScale: 0.14, depth: 2, spread: 0.62 },
+        { nodeIndex: 7, angle: -1.54, axis: "height", length: 0.1, widthScale: 0.14, depth: 2, spread: 0.62 },
+        { nodeIndex: 7, angle: -1.92, axis: "height", length: 0.07, widthScale: 0.11, depth: 1, spread: 0.56 }
+      ];
+
+      const sceneState = {
+        width: 0,
+        height: 0,
+        dpr: 1,
+        groundY: 0,
+        treeX: 0,
+        trunkNodes: [],
+        branchSegments: [],
+        leafOrigins: [],
+        clouds: [],
+        mistBands: [],
+        leaves: [],
+        fallingLeaves: [],
+        redRainDrops: [],
+        groundThings: [],
+        sceneTime: 0,
+        effects: {
+          playbackTime: 0,
+          wind: 0,
+          rain: 0,
+          groundRise: 0,
+          darkness: 0,
+          flash: 0,
+          shakeX: 0,
+          shakeY: 0,
+          fallingLeavesEnabled: true
+        },
+        pointer: {
+          x: 0.5,
+          y: 0.5,
+          targetX: 0.5,
+          targetY: 0.5
+        },
+        parallaxEnabled: true,
+        sceneFrameId: null,
+        lastFrameTime: 0,
+        reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      };
+
+      let lyricWords = [];
+      let activeWordIndex = -1;
+      let lyricsLoaded = false;
+      let rafId = null;
+      let overlayVisible = true;
+      let sequenceLockedAfterEnding = false;
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function getViewportSize() {
+        const viewport = window.visualViewport;
+        const width = viewport ? viewport.width : window.innerWidth;
+        const height = viewport ? viewport.height : window.innerHeight;
+
+        return {
+          width: Math.max(1, Math.ceil(width)),
+          height: Math.max(1, Math.ceil(height))
+        };
+      }
+
+      function randomBetween(min, max, source = Math.random) {
+        return source() * (max - min) + min;
+      }
+
+      function createSeededRandom(seed) {
+        let value = seed >>> 0;
+
+        return () => {
+          value += 0x6d2b79f5;
+          let result = Math.imul(value ^ (value >>> 15), 1 | value);
+          result ^= result + Math.imul(result ^ (result >>> 7), 61 | result);
+          return ((result ^ (result >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function saturate(value) {
+        return clamp(value, 0, 1);
+      }
+
+      function lerp(start, end, amount) {
+        return start + (end - start) * amount;
+      }
+
+      function smoothStep(start, end, value) {
+        if (start === end) {
+          return value >= end ? 1 : 0;
+        }
+
+        const progress = saturate((value - start) / (end - start));
+        return progress * progress * (3 - 2 * progress);
+      }
+
+      function triangularPulse(time, start, attack = 0.08, decay = 0.4) {
+        if (time < start) {
+          return 0;
+        }
+
+        const elapsed = time - start;
+        if (elapsed <= attack) {
+          return elapsed / attack;
+        }
+
+        if (elapsed <= attack + decay) {
+          return 1 - (elapsed - attack) / decay;
+        }
+
+        return 0;
+      }
+
+      function windowLevel(time, start, end, fadeIn = 1.2, fadeOut = fadeIn) {
+        if (time < start || time > end) {
+          return 0;
+        }
+
+        const fadeInLevel = smoothStep(start, start + fadeIn, time);
+        const fadeOutLevel = 1 - smoothStep(end - fadeOut, end, time);
+        return saturate(Math.min(fadeInLevel, fadeOutLevel));
+      }
+
+      function getScenePlaybackTime() {
+        if (previewSceneOnly) {
+          if (Number.isFinite(previewTimeValue)) {
+            return previewTimeValue;
+          }
+
+          return sceneState.sceneTime;
+        }
+
+        if (audio && Number.isFinite(audio.currentTime)) {
+          return audio.currentTime;
+        }
+
+        return sceneState.sceneTime;
+      }
+
+      function hasPermanentEndingReached(time) {
+        return time >= SCENE_EFFECT_TIMINGS.fullDarkAt - 0.35;
+      }
+
+      function seedRedRain() {
+        const rng = createSeededRandom(
+          RAIN_SEED + Math.round(sceneState.width * 0.52) + Math.round(sceneState.height * 0.91)
+        );
+        const dropCount = clamp(Math.round(sceneState.width / 22), 28, 54);
+        sceneState.redRainDrops = Array.from({ length: dropCount }, () => ({
+          x: randomBetween(-0.1, 1.08, rng),
+          phase: randomBetween(0, 1, rng),
+          speed: randomBetween(0.74, 1.36, rng),
+          length: randomBetween(0.022, 0.062, rng),
+          offset: randomBetween(-0.08, 0.12, rng),
+          opacity: randomBetween(0.18, 0.42, rng),
+          depth: randomBetween(0.65, 1.2, rng)
+        }));
+      }
+
+      function seedGroundThings() {
+        const rng = createSeededRandom(
+          GROUND_THING_SEED + Math.round(sceneState.width * 0.83) + Math.round(sceneState.height * 0.37)
+        );
+        const thingCount = clamp(Math.round(sceneState.width / 110), 5, 9);
+        sceneState.groundThings = Array.from({ length: thingCount }, (_, index) => ({
+          x: lerp(0.1, 0.9, (index + 0.5) / thingCount) + randomBetween(-0.03, 0.03, rng),
+          width: randomBetween(0.018, 0.032, rng),
+          height: randomBetween(0.1, 0.18, rng),
+          lean: randomBetween(-0.4, 0.4, rng),
+          fingerSpread: randomBetween(0.012, 0.03, rng),
+          phase: randomBetween(0, Math.PI * 2, rng)
+        }));
+      }
+
+      function getActiveLightning(time) {
+        let strongestFlash = null;
+        let strongestShake = null;
+
+        SCENE_EFFECT_TIMINGS.lightningStrikes.forEach((strikeTime, index) => {
+          const flashPulse = triangularPulse(time, strikeTime, 0.05, 0.28);
+          const shakePulse = triangularPulse(time, strikeTime, 0.03, 0.82);
+
+          if (!strongestFlash || flashPulse > strongestFlash.flashPulse) {
+            strongestFlash = {
+              time: strikeTime,
+              index,
+              flashPulse
+            };
+          }
+
+          if (!strongestShake || shakePulse > strongestShake.shakePulse) {
+            strongestShake = {
+              time: strikeTime,
+              index,
+              shakePulse
+            };
+          }
+        });
+
+        if ((!strongestFlash || strongestFlash.flashPulse <= 0) && (!strongestShake || strongestShake.shakePulse <= 0)) {
+          return null;
+        }
+
+        return {
+          time: strongestFlash && strongestFlash.flashPulse > 0 ? strongestFlash.time : strongestShake.time,
+          index: strongestFlash && strongestFlash.flashPulse > 0 ? strongestFlash.index : strongestShake.index,
+          flashPulse: strongestFlash ? strongestFlash.flashPulse : 0,
+          shakePulse: strongestShake ? strongestShake.shakePulse : 0
+        };
+      }
+
+      function buildSceneEffects(time) {
+        const introWind = windowLevel(time, SCENE_EFFECT_TIMINGS.windIntroStart, SCENE_EFFECT_TIMINGS.calmStart, 6, 4);
+        const finalWind = windowLevel(time, SCENE_EFFECT_TIMINGS.finalStormStart, SCENE_EFFECT_TIMINGS.fullDarkAt, 2, 0.3) * 1.2;
+        const wind = Math.max(introWind, finalWind);
+        const rain = windowLevel(time, SCENE_EFFECT_TIMINGS.redRainStart, SCENE_EFFECT_TIMINGS.calmAgainStart, 1.2, 1.2);
+        const groundRise = windowLevel(time, SCENE_EFFECT_TIMINGS.redRainDotsStart, SCENE_EFFECT_TIMINGS.calmAgainStart, 1.6, 1.2);
+        const darknessBase = smoothStep(SCENE_EFFECT_TIMINGS.darkenStart, SCENE_EFFECT_TIMINGS.fullDarkAt, time);
+        const lightning = getActiveLightning(time);
+        const flash = lightning ? lightning.flashPulse : 0;
+        const mobileShakeScale = sceneState.width < 620 ? 1.18 : 1;
+        const shake = lightning ? lightning.shakePulse * 1.85 * mobileShakeScale : 0;
+        const calmBand = (
+          (time >= SCENE_EFFECT_TIMINGS.calmStart && time < SCENE_EFFECT_TIMINGS.redRainStart)
+          || (time >= SCENE_EFFECT_TIMINGS.calmAgainStart && time < SCENE_EFFECT_TIMINGS.finalStormStart)
+        );
+        const shakeWaveX = Math.sin(sceneState.sceneTime * 36 + time * 10) + Math.sin(sceneState.sceneTime * 54 + time * 5.5) * 0.38;
+        const shakeWaveY = Math.cos(sceneState.sceneTime * 32 + time * 8) + Math.cos(sceneState.sceneTime * 48 + time * 5) * 0.34;
+
+        return {
+          playbackTime: time,
+          wind,
+          rain,
+          groundRise,
+          darkness: darknessBase,
+          flash,
+          lightning,
+          shakeX: sceneState.reducedMotion ? 0 : shakeWaveX * sceneState.width * 0.0035 * shake,
+          shakeY: sceneState.reducedMotion ? 0 : shakeWaveY * sceneState.height * 0.003 * shake,
+          fallingLeavesEnabled: time < SCENE_EFFECT_TIMINGS.calmAgainStart,
+          calmBand
+        };
+      }
+
+      function updateSceneEffects() {
+        sceneState.effects = buildSceneEffects(getScenePlaybackTime());
+      }
+
+      function seedClouds() {
+        sceneState.clouds = CLOUD_TEMPLATES.map((template) => ({
+          ...template,
+          drift: template.startOffset
+        }));
+      }
+
+      function seedMistBands() {
+        const rng = createSeededRandom(
+          MIST_SEED + Math.round(sceneState.width * 0.73) + Math.round(sceneState.height * 1.11)
+        );
+        const bandCount = clamp(Math.round(sceneState.width / 300), 4, 6);
+
+        sceneState.mistBands = Array.from({ length: bandCount }, (_, index) => ({
+          x: randomBetween(-0.08, 1.02, rng),
+          y: randomBetween(0.24, 0.72, rng),
+          width: randomBetween(0.18, 0.42, rng),
+          height: randomBetween(0.05, 0.12, rng),
+          opacity: randomBetween(0.045, 0.12, rng),
+          sway: randomBetween(0.008, 0.024, rng),
+          lift: randomBetween(0.004, 0.016, rng),
+          phase: randomBetween(0, Math.PI * 2, rng),
+          layer: index < Math.ceil(bandCount * 0.55) ? "back" : "front"
+        }));
+      }
+
+      function addLeafOrigin(x, y) {
+        if (y < sceneState.groundY - sceneState.height * 0.03) {
+          sceneState.leafOrigins.push({ x, y });
+        }
+      }
+
+      function addBranchSegment(x1, y1, x2, y2, width, rng, options = {}) {
+        sceneState.branchSegments.push({
+          x1,
+          y1,
+          x2,
+          y2,
+          width,
+          depth: options.depth || 0,
+          isTrunk: Boolean(options.isTrunk),
+          sway: options.sway ?? 0.4,
+          bend: options.bend ?? randomBetween(-1, 1, rng),
+          phase: options.phase ?? randomBetween(0, Math.PI * 2, rng)
+        });
+      }
+
+      function growBranch(x, y, length, angle, width, depth, rng, spread = 1, extendFactor = 1, generation = 1) {
+        const x2 = x + Math.cos(angle) * length * extendFactor;
+        const y2 = y + Math.sin(angle) * length;
+
+        addBranchSegment(x, y, x2, y2, width, rng, {
+          depth: generation,
+          sway: clamp(0.22 + generation * 0.11, 0.22, 0.94)
+        });
+
+        if (width < Math.max(5, sceneState.width * 0.0036)) {
+          addLeafOrigin(x + (x2 - x) * 0.68, y + (y2 - y) * 0.68);
+          addLeafOrigin(x2, y2);
+        }
+
+        if (depth <= 0 || width < 1.4) {
+          addLeafOrigin(x2, y2);
+          return;
+        }
+
+        const childCount = depth >= 4 ? 3 : depth >= 2 ? 2 : 1;
+
+        for (let index = 0; index < childCount; index += 1) {
+          const direction = childCount === 1 ? (Math.cos(angle) >= 0 ? 1 : -1) : (index === 0 ? -1 : 1);
+          const angleShift = direction * randomBetween(0.16, 0.42, rng) * spread;
+          const lift = randomBetween(0.02, 0.15, rng);
+          const nextAngle = angle + angleShift - lift;
+
+          growBranch(
+            x2,
+            y2,
+            length * randomBetween(0.52, 0.74, rng),
+            nextAngle,
+            width * randomBetween(0.52, 0.7, rng),
+            depth - 1,
+            rng,
+            spread * randomBetween(0.86, 1.02, rng),
+            extendFactor,
+            generation + 1
+          );
+        }
+
+        if (depth <= 1) {
+          addLeafOrigin(x2, y2);
+        }
+      }
+
+      function buildTree() {
+        const rng = createSeededRandom(TREE_SEED);
+        const isDesktop = sceneState.width >= 900;
+        const mobileTreeScale = isDesktop
+          ? 1
+          : sceneState.width < 520
+            ? 0.9
+            : 0.94;
+        const trunkHeightScale = (isDesktop ? 0.62 : 0.58) * mobileTreeScale;
+        const branchReachScale = (isDesktop ? 0.68 : 0.62) * mobileTreeScale;
+        const trunkProfile = [
+          { rise: 0.18, shift: -0.002 },
+          { rise: 0.17, shift: 0.003 },
+          { rise: 0.155, shift: 0.004 },
+          { rise: 0.14, shift: 0.003 },
+          { rise: 0.125, shift: 0.004 },
+          { rise: 0.11, shift: 0.003 },
+          { rise: 0.095, shift: 0.002 },
+          { rise: 0.085, shift: 0.002 },
+          { rise: 0.075, shift: 0.0015 },
+          { rise: 0.065, shift: 0.001 }
+        ];
+
+        sceneState.trunkNodes = [];
+        sceneState.branchSegments = [];
+        sceneState.leafOrigins = [];
+        sceneState.groundY = sceneState.height * 0.78;
+        sceneState.treeX = sceneState.width * 0.5;
+
+        const baseY = sceneState.groundY + sceneState.height * 0.18;
+        const trunkNodes = sceneState.trunkNodes;
+        let currentX = sceneState.treeX;
+        let currentY = baseY;
+        let currentWidth = (sceneState.width < 520
+          ? Math.max(24, sceneState.width * 0.032)
+          : Math.max(34, sceneState.width * 0.04)) * mobileTreeScale;
+
+        trunkProfile.forEach((step, index) => {
+          const drift = step.shift + randomBetween(-0.001, 0.001, rng);
+          const nextX = currentX + sceneState.width * drift;
+          const nextY = currentY - sceneState.height * step.rise * trunkHeightScale;
+
+          addBranchSegment(currentX, currentY, nextX, nextY, currentWidth, rng, {
+            isTrunk: true,
+            sway: clamp(0.08 + index * 0.01, 0.08, 0.18),
+            bend: randomBetween(-0.22, 0.22, rng),
+            phase: randomBetween(0, Math.PI * 2, rng)
+          });
+
+          trunkNodes.push({
+            x: nextX,
+            y: nextY,
+            width: currentWidth
+          });
+
+          currentX = nextX;
+          currentY = nextY;
+          currentWidth *= index < 2 ? 0.95 : 0.9;
+        });
+
+        const branchPlans = isDesktop ? DESKTOP_BRANCH_PLANS : PRIMARY_BRANCH_PLANS;
+        const thicknessScale = isDesktop ? 0.68 : 0.76;
+        const depthBoost = 0;
+        const extendFactor = isDesktop ? 0.88 : 0.86;
+
+        branchPlans.forEach((plan) => {
+          const node = trunkNodes[Math.min(plan.nodeIndex, trunkNodes.length - 1)];
+          const branchLength = plan.axis === "width"
+            ? sceneState.width * plan.length
+            : sceneState.height * plan.length;
+
+          growBranch(
+            node.x,
+            node.y,
+            branchLength * branchReachScale,
+            plan.angle,
+            node.width * plan.widthScale * thicknessScale,
+            plan.depth + depthBoost,
+            rng,
+            plan.spread,
+            extendFactor
+          );
+        });
+
+        sceneState.branchSegments.forEach((segment) => {
+          if (segment.width < Math.max(4.5, sceneState.width * 0.0032)) {
+            addLeafOrigin(segment.x1 + (segment.x2 - segment.x1) * 0.78, segment.y1 + (segment.y2 - segment.y1) * 0.78);
+          }
+        });
+
+        sceneState.branchSegments.sort((a, b) => b.width - a.width);
+
+        if (!sceneState.leafOrigins.length) {
+          addLeafOrigin(currentX, currentY);
+        }
+      }
+
+      function pickLeafOrigin(source = Math.random) {
+        return {
+          x: source() * sceneState.width,
+          y: sceneState.groundY
+        };
+      }
+
+      function resetLeaf(leaf, scatter = false, source = Math.random) {
+        const depth = source();
+        const origin = pickLeafOrigin(source);
+        const isMobile = sceneState.width < 620;
+        leaf.x = origin.x + randomBetween(-26, 26, source);
+        leaf.y = sceneState.groundY
+          + sceneState.height * randomBetween(isMobile ? -0.004 : -0.018, isMobile ? 0.058 : 0.095, source)
+          + depth * sceneState.height * (isMobile ? 0.018 : 0.028);
+        leaf.size = randomBetween(6, 13, source) * (0.84 + depth * 0.54) * (isMobile ? 0.82 : 1);
+        leaf.rotation = randomBetween(-0.44, 0.44, source);
+        leaf.widthScale = randomBetween(0.18, 0.3, source);
+        leaf.stretch = randomBetween(1.18, 1.9, source) * (isMobile ? 0.84 : 1);
+        leaf.sway = randomBetween(0.08, 0.24, source);
+        leaf.swaySpeed = randomBetween(0.72, 1.9, source);
+        leaf.phase = randomBetween(0, Math.PI * 2, source);
+        leaf.alpha = randomBetween(0.62, 0.96, source);
+        leaf.elapsed = randomBetween(0, Math.PI * 2, source);
+        leaf.depth = depth;
+        leaf.blades = Math.max(2, Math.round(randomBetween(2, 3.4, source)));
+        leaf.layer = depth < 0.5 ? "back" : "front";
+
+        if (scatter) {
+          leaf.x += randomBetween(-sceneState.width * 0.02, sceneState.width * 0.02, source);
+        }
+      }
+
+      function pickFallingLeafOrigin(source = Math.random) {
+        if (sceneState.leafOrigins.length) {
+          const origin = sceneState.leafOrigins[Math.floor(source() * sceneState.leafOrigins.length)];
+          return {
+            x: origin.x,
+            y: origin.y
+          };
+        }
+
+        return {
+          x: source() * sceneState.width,
+          y: -sceneState.height * 0.12
+        };
+      }
+
+      function resetFallingLeaf(leaf, scatter = false, source = Math.random) {
+        const origin = pickFallingLeafOrigin(source);
+        leaf.x = origin.x + randomBetween(-40, 40, source);
+        leaf.y = origin.y + randomBetween(-26, 24, source);
+        leaf.size = randomBetween(4.2, 8.4, source);
+        leaf.rotation = randomBetween(0, Math.PI * 2, source);
+        leaf.spin = randomBetween(-1.8, 1.8, source);
+        leaf.vx = randomBetween(18, 52, source) * (source() < 0.3 ? -0.5 : 1);
+        leaf.vy = randomBetween(34, 84, source);
+        leaf.sway = randomBetween(12, 26, source);
+        leaf.swaySpeed = randomBetween(1.1, 2.2, source);
+        leaf.phase = randomBetween(0, Math.PI * 2, source);
+        leaf.alpha = randomBetween(0.56, 0.84, source);
+        leaf.elapsed = randomBetween(0, 1.8, source);
+
+        if (scatter) {
+          leaf.y += randomBetween(0, sceneState.height * 0.9, source);
+          leaf.x += leaf.vx * randomBetween(0.2, 2.2, source);
+        }
+      }
+
+      function seedLeaves() {
+        const leafCount = sceneState.reducedMotion ? 44 : clamp(Math.round(sceneState.width / 10), 72, 128);
+        const rng = createSeededRandom(
+          LEAF_SEED + Math.round(sceneState.width * 1.6) + Math.round(sceneState.height * 0.9)
+        );
+        sceneState.leaves = Array.from({ length: leafCount }, () => ({}));
+
+        sceneState.leaves.forEach((leaf) => {
+          resetLeaf(leaf, true, rng);
+        });
+        sceneState.leaves.sort((a, b) => a.y - b.y);
+      }
+
+      function seedFallingLeaves() {
+        const leafCount = sceneState.reducedMotion ? 8 : clamp(Math.round(sceneState.width / 90), 10, 18);
+        const rng = createSeededRandom(
+          LEAF_SEED + 97 + Math.round(sceneState.width * 0.7) + Math.round(sceneState.height * 1.3)
+        );
+        sceneState.fallingLeaves = Array.from({ length: leafCount }, () => ({}));
+        sceneState.fallingLeaves.forEach((leaf) => {
+          resetFallingLeaf(leaf, true, rng);
+        });
+      }
+
+      function resizeScene() {
+        if (!sceneCanvas || !sceneCtx) {
+          return;
+        }
+
+        const viewportSize = getViewportSize();
+        sceneState.width = viewportSize.width;
+        sceneState.height = viewportSize.height;
+        sceneState.parallaxEnabled = shouldEnableParallax();
+        const dprCap = sceneState.width >= 1200 || sceneState.height >= 900 ? 1.15 : 1.3;
+        sceneState.dpr = Math.min(window.devicePixelRatio || 1, dprCap);
+
+        if (!sceneState.parallaxEnabled) {
+          sceneState.pointer.x = 0.5;
+          sceneState.pointer.y = 0.5;
+          resetPointerTarget();
+        }
+
+        sceneCanvas.width = Math.round(sceneState.width * sceneState.dpr);
+        sceneCanvas.height = Math.round(sceneState.height * sceneState.dpr);
+        sceneCanvas.style.width = `${sceneState.width}px`;
+        sceneCanvas.style.height = `${sceneState.height}px`;
+        sceneCtx.setTransform(sceneState.dpr, 0, 0, sceneState.dpr, 0, 0);
+
+        buildTree();
+
+        if (!sceneState.clouds.length) {
+          seedClouds();
+        }
+
+        seedMistBands();
+        seedLeaves();
+        seedFallingLeaves();
+        seedRedRain();
+        seedGroundThings();
+        updateSceneEffects();
+        drawScene();
+      }
+
+      function updateClouds(delta) {
+        if (sceneState.reducedMotion) {
+          return;
+        }
+
+        const windFactor = 1 + sceneState.effects.wind * 2.2;
+        sceneState.clouds.forEach((cloud) => {
+          cloud.drift += cloud.speed * windFactor * delta;
+
+          if (cloud.drift > 1.45) {
+            cloud.drift -= 2.9;
+          }
+
+          if (cloud.drift < -1.45) {
+            cloud.drift += 2.9;
+          }
+        });
+      }
+
+      function updateLeaves(delta) {
+        sceneState.leaves.forEach((leaf) => {
+          leaf.elapsed += delta * (1 + sceneState.effects.wind * 1.5);
+        });
+      }
+
+      function updateFallingLeaves(delta) {
+        if (!sceneState.effects.fallingLeavesEnabled) {
+          return;
+        }
+
+        const windBoost = 1 + sceneState.effects.wind * 3.1;
+        sceneState.fallingLeaves.forEach((leaf) => {
+          leaf.elapsed += delta;
+          leaf.x += leaf.vx * windBoost * delta + Math.sin(leaf.elapsed * leaf.swaySpeed + leaf.phase) * leaf.sway * windBoost * delta;
+          leaf.y += leaf.vy * (1 + sceneState.effects.wind * 0.9) * delta;
+          leaf.rotation += leaf.spin * windBoost * delta;
+
+          if (
+            leaf.y > sceneState.groundY + sceneState.height * 0.18 ||
+            leaf.x > sceneState.width + 72 ||
+            leaf.x < -72
+          ) {
+            resetFallingLeaf(leaf);
+          }
+        });
+      }
+
+      function drawCloud(cloud) {
+        const x = (cloud.baseX + cloud.drift) * sceneState.width;
+        const y = cloud.baseY * sceneState.height;
+        const width = cloud.widthRatio * sceneState.width;
+        const height = cloud.heightRatio * sceneState.height;
+
+        sceneCtx.save();
+        sceneCtx.fillStyle = `rgba(${cloud.shade}, ${cloud.shade}, ${cloud.shade}, ${cloud.opacity})`;
+        sceneCtx.beginPath();
+
+        CLOUD_PUFFS.forEach((puff) => {
+          sceneCtx.moveTo(x + puff.ox * width + puff.rx * width, y + puff.oy * height);
+          sceneCtx.ellipse(
+            x + puff.ox * width,
+            y + puff.oy * height,
+            puff.rx * width,
+            puff.ry * height,
+            0,
+            0,
+            Math.PI * 2
+          );
+        });
+
+        sceneCtx.fill();
+        sceneCtx.restore();
+      }
+
+      function drawBackdropLight() {
+        const { x: overscanX, y: overscanY } = getSceneOverscan();
+        const glow = sceneCtx.createRadialGradient(
+          sceneState.width * 0.34,
+          sceneState.height * 0.25,
+          sceneState.width * 0.04,
+          sceneState.width * 0.34,
+          sceneState.height * 0.25,
+          sceneState.width * 0.58
+        );
+        glow.addColorStop(0, "rgba(255, 255, 255, 0.34)");
+        glow.addColorStop(0.42, "rgba(244, 246, 249, 0.16)");
+        glow.addColorStop(1, "rgba(244, 246, 249, 0)");
+        sceneCtx.fillStyle = glow;
+        sceneCtx.fillRect(
+          -overscanX,
+          -overscanY,
+          sceneState.width + overscanX * 2,
+          sceneState.groundY + sceneState.height * 0.16 + overscanY * 2
+        );
+      }
+
+      function getPointerOffset(xAmplitude, yAmplitude = xAmplitude * 0.65) {
+        if (!sceneState.parallaxEnabled) {
+          return { x: 0, y: 0 };
+        }
+
+        const normalizedX = sceneState.pointer.x - 0.5;
+        const normalizedY = sceneState.pointer.y - 0.5;
+
+        return {
+          x: normalizedX * xAmplitude,
+          y: normalizedY * yAmplitude
+        };
+      }
+
+      function drawLayerWithParallax(xAmplitude, yAmplitude, drawCallback) {
+        const offset = getPointerOffset(xAmplitude, yAmplitude);
+        sceneCtx.save();
+        sceneCtx.translate(offset.x, offset.y);
+        drawCallback();
+        sceneCtx.restore();
+      }
+
+      function getSceneOverscan() {
+        const mobileEdgeBoost = sceneState.width < 620 ? 1.35 : 1;
+
+        return {
+          x: Math.max(sceneState.width * 0.1 * mobileEdgeBoost, 44),
+          y: Math.max(sceneState.height * 0.1 * mobileEdgeBoost, 44)
+        };
+      }
+
+      function shouldEnableParallax() {
+        const hasTouchLikePointer = window.matchMedia("(hover: none)").matches || window.matchMedia("(pointer: coarse)").matches;
+        return !(sceneState.width <= 820 && hasTouchLikePointer);
+      }
+
+      function toMountainCanvasPoints(baseY, points, yOffset = 0) {
+        return points.map((point) => ({
+          x: sceneState.width * point.x,
+          y: baseY + sceneState.height * (point.y + yOffset)
+        }));
+      }
+
+      function traceMountainRidge(baseY, points, yOffset = 0) {
+        const ridgePoints = toMountainCanvasPoints(baseY, points, yOffset);
+        const first = ridgePoints[0];
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(first.x, first.y);
+
+        for (let index = 1; index < ridgePoints.length; index += 1) {
+          sceneCtx.lineTo(ridgePoints[index].x, ridgePoints[index].y);
+        }
+      }
+
+      function drawMountainRange(baseY, palette, points) {
+        const { x: overscanX, y: overscanY } = getSceneOverscan();
+        const bottomY = sceneState.height + overscanY;
+
+        traceMountainRidge(baseY, points);
+        sceneCtx.lineTo(sceneState.width + overscanX, bottomY);
+        sceneCtx.lineTo(-overscanX, bottomY);
+        sceneCtx.closePath();
+
+        const fillGradient = sceneCtx.createLinearGradient(
+          0,
+          baseY - sceneState.height * 0.22,
+          0,
+          sceneState.groundY + sceneState.height * 0.16 + overscanY
+        );
+        fillGradient.addColorStop(0, palette.top);
+        fillGradient.addColorStop(0.54, palette.mid);
+        fillGradient.addColorStop(1, palette.base);
+        sceneCtx.fillStyle = fillGradient;
+        sceneCtx.fill();
+
+        const slopeShade = sceneCtx.createLinearGradient(
+          -overscanX,
+          baseY - overscanY,
+          sceneState.width + overscanX,
+          sceneState.groundY + sceneState.height * 0.16 + overscanY
+        );
+        slopeShade.addColorStop(0, palette.shadowLight);
+        slopeShade.addColorStop(0.5, "rgba(0, 0, 0, 0)");
+        slopeShade.addColorStop(1, palette.shadowDark);
+        sceneCtx.fillStyle = slopeShade;
+        sceneCtx.fill();
+      }
+
+      function drawMountainHighlights(baseY, color, points, widthValue, yOffset = -0.012) {
+        sceneCtx.save();
+        sceneCtx.strokeStyle = color;
+        sceneCtx.lineWidth = widthValue;
+        sceneCtx.lineCap = "round";
+        sceneCtx.lineJoin = "round";
+        traceMountainRidge(baseY, points, yOffset);
+        sceneCtx.stroke();
+        sceneCtx.restore();
+      }
+
+      function drawSky() {
+        const { x: overscanX, y: overscanY } = getSceneOverscan();
+        const fullWidth = sceneState.width + overscanX * 2;
+        const fullHeight = sceneState.height + overscanY * 2;
+
+        const skyGradient = sceneCtx.createLinearGradient(0, 0, 0, sceneState.height);
+        skyGradient.addColorStop(0, "#f7f8fa");
+        skyGradient.addColorStop(0.22, "#e6e8ed");
+        skyGradient.addColorStop(0.48, "#cfd2d9");
+        skyGradient.addColorStop(0.74, "#aeb3bc");
+        skyGradient.addColorStop(1, "#8b909a");
+        sceneCtx.fillStyle = skyGradient;
+        sceneCtx.fillRect(-overscanX, -overscanY, fullWidth, fullHeight);
+
+        const haze = sceneCtx.createLinearGradient(0, 0, 0, sceneState.groundY);
+        haze.addColorStop(0, "rgba(255, 255, 255, 0.28)");
+        haze.addColorStop(0.35, "rgba(234, 236, 240, 0.36)");
+        haze.addColorStop(0.7, "rgba(196, 200, 206, 0.46)");
+        haze.addColorStop(1, "rgba(165, 170, 178, 0.52)");
+        sceneCtx.fillStyle = haze;
+        sceneCtx.fillRect(-overscanX, -overscanY, fullWidth, sceneState.groundY + sceneState.height * 0.14 + overscanY * 2);
+
+        const overcast = sceneCtx.createLinearGradient(0, 0, 0, sceneState.height * 0.7);
+        overcast.addColorStop(0, "rgba(200, 204, 210, 0.38)");
+        overcast.addColorStop(0.6, "rgba(190, 194, 201, 0.28)");
+        overcast.addColorStop(1, "rgba(180, 184, 192, 0)");
+        sceneCtx.fillStyle = overcast;
+        sceneCtx.fillRect(-overscanX, -overscanY, fullWidth, sceneState.height * 0.84 + overscanY * 2);
+
+        const bandCount = 5;
+        for (let band = 0; band < bandCount; band += 1) {
+          const bandY = sceneState.height * (0.12 + band * 0.12);
+          const bandHeight = sceneState.height * (0.08 + band * 0.003);
+          const opacity = 0.18 - band * 0.02;
+          const bandShade = Math.round(224 - band * 5);
+
+          for (let pass = 0; pass < 2; pass += 1) {
+            const puffShift = pass === 0 ? 0 : bandHeight * 0.22;
+            const soften = pass === 0 ? 0.75 : 0.5;
+            sceneCtx.fillStyle = `rgba(${bandShade}, ${bandShade + 3}, ${bandShade + 8}, ${Math.max(opacity * soften, 0.06)})`;
+            sceneCtx.beginPath();
+            sceneCtx.moveTo(0, bandY + puffShift);
+            sceneCtx.bezierCurveTo(
+              sceneState.width * 0.16,
+              bandY - bandHeight * 0.55 + puffShift,
+              sceneState.width * 0.42,
+              bandY + bandHeight * 0.45 + puffShift,
+              sceneState.width * 0.64,
+              bandY - bandHeight * 0.25 + puffShift
+            );
+            sceneCtx.bezierCurveTo(
+              sceneState.width * 0.82,
+              bandY - bandHeight * 0.6 + puffShift,
+              sceneState.width * 0.94,
+              bandY + bandHeight * 0.3 + puffShift,
+              sceneState.width,
+              bandY + puffShift
+            );
+            sceneCtx.lineTo(sceneState.width, bandY + bandHeight + puffShift);
+            sceneCtx.bezierCurveTo(
+              sceneState.width * 0.86,
+              bandY + bandHeight * 1.35 + puffShift,
+              sceneState.width * 0.5,
+              bandY + bandHeight * 0.95 + puffShift,
+              0,
+              bandY + bandHeight + puffShift
+            );
+            sceneCtx.closePath();
+            sceneCtx.fill();
+          }
+        }
+
+        sceneCtx.fillStyle = "rgba(255, 255, 255, 0.14)";
+        sceneCtx.beginPath();
+        sceneCtx.ellipse(
+          sceneState.width * 0.18,
+          sceneState.height * 0.16,
+          sceneState.width * 0.35,
+          sceneState.height * 0.12,
+          0,
+          0,
+          Math.PI * 2
+        );
+        sceneCtx.ellipse(
+          sceneState.width * 0.54,
+          sceneState.height * 0.2,
+          sceneState.width * 0.42,
+          sceneState.height * 0.14,
+          0,
+          0,
+          Math.PI * 2
+        );
+        sceneCtx.ellipse(
+          sceneState.width * 0.86,
+          sceneState.height * 0.14,
+          sceneState.width * 0.28,
+          sceneState.height * 0.1,
+          0,
+          0,
+          Math.PI * 2
+        );
+        sceneCtx.fill();
+
+        sceneCtx.fillStyle = "rgba(210, 214, 220, 0.18)";
+        sceneCtx.beginPath();
+        sceneCtx.ellipse(
+          sceneState.width * 0.26,
+          sceneState.height * 0.3,
+          sceneState.width * 0.42,
+          sceneState.height * 0.12,
+          0,
+          0,
+          Math.PI * 2
+        );
+        sceneCtx.ellipse(
+          sceneState.width * 0.72,
+          sceneState.height * 0.28,
+          sceneState.width * 0.36,
+          sceneState.height * 0.11,
+          0,
+          0,
+          Math.PI * 2
+        );
+        sceneCtx.fill();
+
+        const mountainBaseY = sceneState.groundY - sceneState.height * 0.14;
+        const farRange = [
+          { x: -0.08, y: 0.11 },
+          { x: 0.02, y: 0.06 },
+          { x: 0.12, y: -0.08 },
+          { x: 0.22, y: -0.02 },
+          { x: 0.34, y: -0.2 },
+          { x: 0.46, y: -0.09 },
+          { x: 0.58, y: -0.26 },
+          { x: 0.7, y: -0.14 },
+          { x: 0.82, y: -0.22 },
+          { x: 0.94, y: -0.09 },
+          { x: 1.08, y: 0.05 }
+        ];
+        const middleRange = [
+          { x: -0.08, y: 0.16 },
+          { x: 0.04, y: 0.08 },
+          { x: 0.16, y: -0.03 },
+          { x: 0.28, y: -0.19 },
+          { x: 0.38, y: -0.06 },
+          { x: 0.5, y: -0.23 },
+          { x: 0.62, y: -0.03 },
+          { x: 0.74, y: -0.18 },
+          { x: 0.86, y: 0.01 },
+          { x: 0.96, y: -0.09 },
+          { x: 1.08, y: 0.11 }
+        ];
+        const nearRange = [
+          { x: -0.08, y: 0.2 },
+          { x: 0.06, y: 0.12 },
+          { x: 0.18, y: 0.03 },
+          { x: 0.3, y: -0.11 },
+          { x: 0.42, y: 0.02 },
+          { x: 0.56, y: -0.14 },
+          { x: 0.68, y: -0.02 },
+          { x: 0.8, y: -0.11 },
+          { x: 0.92, y: 0.02 },
+          { x: 1.08, y: 0.15 }
+        ];
+
+        drawMountainRange(mountainBaseY - sceneState.height * 0.03, {
+          top: "rgba(171, 178, 188, 0.44)",
+          mid: "rgba(142, 149, 160, 0.52)",
+          base: "rgba(118, 124, 133, 0.62)",
+          shadowLight: "rgba(255, 255, 255, 0.07)",
+          shadowDark: "rgba(82, 88, 97, 0.14)"
+        }, farRange);
+        drawMountainHighlights(
+          mountainBaseY - sceneState.height * 0.03,
+          "rgba(249, 251, 253, 0.12)",
+          farRange,
+          Math.max(1.1, sceneState.width * 0.0015),
+          -0.016
+        );
+        drawMountainRange(mountainBaseY + sceneState.height * 0.038, {
+          top: "rgba(119, 126, 136, 0.7)",
+          mid: "rgba(88, 94, 104, 0.78)",
+          base: "rgba(60, 66, 73, 0.88)",
+          shadowLight: "rgba(255, 255, 255, 0.06)",
+          shadowDark: "rgba(16, 18, 21, 0.18)"
+        }, middleRange);
+        drawMountainHighlights(
+          mountainBaseY + sceneState.height * 0.038,
+          "rgba(241, 244, 248, 0.08)",
+          middleRange,
+          Math.max(1, sceneState.width * 0.00135),
+          -0.012
+        );
+        drawMountainRange(mountainBaseY + sceneState.height * 0.106, {
+          top: "rgba(58, 62, 68, 0.9)",
+          mid: "rgba(34, 37, 41, 0.96)",
+          base: "rgba(13, 14, 16, 0.98)",
+          shadowLight: "rgba(255, 255, 255, 0.03)",
+          shadowDark: "rgba(0, 0, 0, 0.18)"
+        }, nearRange);
+        drawMountainHighlights(
+          mountainBaseY + sceneState.height * 0.106,
+          "rgba(214, 220, 228, 0.035)",
+          nearRange,
+          Math.max(0.9, sceneState.width * 0.001),
+          -0.006
+        );
+
+        sceneCtx.fillStyle = "rgba(206, 212, 220, 0.08)";
+        sceneCtx.beginPath();
+        sceneCtx.ellipse(
+          sceneState.width * 0.42,
+          mountainBaseY + sceneState.height * 0.1,
+          sceneState.width * 0.44,
+          sceneState.height * 0.08,
+          0,
+          0,
+          Math.PI * 2
+        );
+        sceneCtx.fill();
+      }
+
+      function drawAtmosphericMist(layer = "back") {
+        sceneState.mistBands.forEach((band) => {
+          if (band.layer !== layer) {
+            return;
+          }
+
+          const drift = sceneState.reducedMotion
+            ? 0
+            : Math.sin(sceneState.sceneTime * (0.24 + band.sway * 12) + band.phase) * sceneState.width * band.sway;
+          const lift = sceneState.reducedMotion
+            ? 0
+            : Math.cos(sceneState.sceneTime * (0.2 + band.lift * 20) + band.phase) * sceneState.height * band.lift;
+          const cx = band.x * sceneState.width + drift;
+          const cy = band.y * sceneState.height + lift;
+          const rx = band.width * sceneState.width * (layer === "front" ? 1.08 : 1);
+          const ry = band.height * sceneState.height * (layer === "front" ? 0.92 : 1);
+          const mistGradient = sceneCtx.createRadialGradient(cx, cy, rx * 0.08, cx, cy, rx);
+          mistGradient.addColorStop(0, `rgba(248, 249, 251, ${band.opacity.toFixed(3)})`);
+          mistGradient.addColorStop(0.56, `rgba(222, 226, 231, ${(band.opacity * 0.54).toFixed(3)})`);
+          mistGradient.addColorStop(1, "rgba(222, 226, 231, 0)");
+
+          sceneCtx.fillStyle = mistGradient;
+          sceneCtx.beginPath();
+          sceneCtx.ellipse(cx, cy, rx, ry, band.phase * 0.08, 0, Math.PI * 2);
+          sceneCtx.fill();
+        });
+      }
+
+      function drawGround() {
+        const groundY = sceneState.groundY;
+        const { x: overscanX, y: overscanY } = getSceneOverscan();
+        const overscanBottom = Math.max(overscanY * 1.4, 56);
+        const startX = -overscanX;
+        const endX = sceneState.width + overscanX;
+        const bottomY = sceneState.height + overscanBottom;
+        const rearGradient = sceneCtx.createLinearGradient(0, groundY - sceneState.height * 0.05, 0, bottomY);
+        rearGradient.addColorStop(0, "#171717");
+        rearGradient.addColorStop(0.42, "#080808");
+        rearGradient.addColorStop(1, "#000000");
+
+        sceneCtx.fillStyle = rearGradient;
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(startX, bottomY);
+        sceneCtx.lineTo(startX, groundY + sceneState.height * 0.024);
+        sceneCtx.bezierCurveTo(
+          sceneState.width * 0.14,
+          groundY - sceneState.height * 0.05,
+          sceneState.width * 0.36,
+          groundY + sceneState.height * 0.012,
+          sceneState.width * 0.55,
+          groundY - sceneState.height * 0.028
+        );
+        sceneCtx.bezierCurveTo(
+          sceneState.width * 0.7,
+          groundY - sceneState.height * 0.05,
+          sceneState.width * 0.86,
+          groundY + sceneState.height * 0.006,
+          endX,
+          groundY - sceneState.height * 0.024
+        );
+        sceneCtx.lineTo(endX, bottomY);
+        sceneCtx.closePath();
+        sceneCtx.fill();
+
+        const frontGradient = sceneCtx.createLinearGradient(0, groundY, 0, bottomY);
+        frontGradient.addColorStop(0, "#0b0b0b");
+        frontGradient.addColorStop(0.56, "#030303");
+        frontGradient.addColorStop(1, "#000000");
+        sceneCtx.fillStyle = frontGradient;
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(startX, bottomY);
+        sceneCtx.lineTo(startX, groundY + sceneState.height * 0.1);
+        sceneCtx.bezierCurveTo(
+          sceneState.width * 0.22,
+          groundY + sceneState.height * 0.008,
+          sceneState.width * 0.44,
+          groundY + sceneState.height * 0.085,
+          sceneState.width * 0.7,
+          groundY + sceneState.height * 0.034
+        );
+        sceneCtx.bezierCurveTo(
+          sceneState.width * 0.83,
+          groundY + sceneState.height * 0.006,
+          sceneState.width * 0.92,
+          groundY + sceneState.height * 0.074,
+          endX,
+          groundY + sceneState.height * 0.056
+        );
+        sceneCtx.lineTo(endX, bottomY);
+        sceneCtx.closePath();
+        sceneCtx.fill();
+
+        sceneCtx.fillStyle = "rgba(255, 255, 255, 0.03)";
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(startX, groundY + sceneState.height * 0.015);
+        sceneCtx.bezierCurveTo(
+          sceneState.width * 0.18,
+          groundY - sceneState.height * 0.008,
+          sceneState.width * 0.46,
+          groundY + sceneState.height * 0.026,
+          sceneState.width * 0.68,
+          groundY - sceneState.height * 0.002
+        );
+        sceneCtx.bezierCurveTo(
+          sceneState.width * 0.84,
+          groundY - sceneState.height * 0.02,
+          sceneState.width * 0.94,
+          groundY + sceneState.height * 0.012,
+          endX,
+          groundY - sceneState.height * 0.006
+        );
+        sceneCtx.lineTo(endX, groundY + sceneState.height * 0.018);
+        sceneCtx.bezierCurveTo(
+          sceneState.width * 0.78,
+          groundY + sceneState.height * 0.028,
+          sceneState.width * 0.36,
+          groundY + sceneState.height * 0.016,
+          startX,
+          groundY + sceneState.height * 0.03
+        );
+        sceneCtx.closePath();
+        sceneCtx.fill();
+      }
+
+      function cubicBezierPoint(t, p0, p1, p2, p3) {
+        const invT = 1 - t;
+        const invT2 = invT * invT;
+        const t2 = t * t;
+
+        return {
+          x: invT2 * invT * p0.x + 3 * invT2 * t * p1.x + 3 * invT * t2 * p2.x + t2 * t * p3.x,
+          y: invT2 * invT * p0.y + 3 * invT2 * t * p1.y + 3 * invT * t2 * p2.y + t2 * t * p3.y
+        };
+      }
+
+      function sampleBezierYForX(x, p0, p1, p2, p3) {
+        const steps = 36;
+        let previous = cubicBezierPoint(0, p0, p1, p2, p3);
+
+        for (let index = 1; index <= steps; index += 1) {
+          const point = cubicBezierPoint(index / steps, p0, p1, p2, p3);
+          if (x <= point.x) {
+            const span = point.x - previous.x || 1;
+            const ratio = clamp((x - previous.x) / span, 0, 1);
+            return previous.y + (point.y - previous.y) * ratio;
+          }
+          previous = point;
+        }
+
+        return p3.y;
+      }
+
+      function getForegroundGroundY(x) {
+        const width = sceneState.width;
+        const height = sceneState.height;
+        const groundY = sceneState.groundY;
+        const overscanX = getSceneOverscan().x;
+
+        const start = { x: -overscanX, y: groundY + height * 0.1 };
+        const leftControlA = { x: width * 0.22, y: groundY + height * 0.008 };
+        const leftControlB = { x: width * 0.44, y: groundY + height * 0.085 };
+        const middle = { x: width * 0.7, y: groundY + height * 0.034 };
+        const rightControlA = { x: width * 0.83, y: groundY + height * 0.006 };
+        const rightControlB = { x: width * 0.92, y: groundY + height * 0.074 };
+        const end = { x: width + overscanX, y: groundY + height * 0.056 };
+        const clampedX = clamp(x, 0, width);
+
+        if (clampedX <= middle.x) {
+          return sampleBezierYForX(clampedX, start, leftControlA, leftControlB, middle);
+        }
+
+        return sampleBezierYForX(clampedX, middle, rightControlA, rightControlB, end);
+      }
+
+      function drawFigureShadow(x, y, widthValue, opacity) {
+        const shadowGradient = sceneCtx.createRadialGradient(x, y, widthValue * 0.12, x, y, widthValue);
+        shadowGradient.addColorStop(0, `rgba(0, 0, 0, ${opacity})`);
+        shadowGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+        sceneCtx.fillStyle = shadowGradient;
+        sceneCtx.beginPath();
+        sceneCtx.ellipse(x, y, widthValue, widthValue * 0.24, -0.08, 0, Math.PI * 2);
+        sceneCtx.fill();
+      }
+
+      function drawWomanFigure() {
+        if (!figureSprites.woman.complete || !figureSprites.woman.naturalWidth) {
+          return;
+        }
+
+        const drawHeight = 100;
+        const drawWidth = drawHeight * (figureSprites.woman.naturalWidth / figureSprites.woman.naturalHeight);
+
+        sceneCtx.save();
+        sceneCtx.drawImage(
+          figureSprites.woman,
+          -drawWidth * 0.5,
+          -drawHeight,
+          drawWidth,
+          drawHeight
+        );
+        sceneCtx.restore();
+      }
+
+      function drawManFigure() {
+        if (!figureSprites.man.complete || !figureSprites.man.naturalWidth) {
+          return;
+        }
+
+        const drawHeight = 100;
+        const drawWidth = drawHeight * (figureSprites.man.naturalWidth / figureSprites.man.naturalHeight);
+
+        sceneCtx.save();
+        sceneCtx.globalAlpha = 1;
+        sceneCtx.filter = "brightness(0) saturate(0) contrast(2)";
+        sceneCtx.drawImage(
+          figureSprites.man,
+          -drawWidth * 0.5,
+          -drawHeight,
+          drawWidth,
+          drawHeight
+        );
+        sceneCtx.restore();
+      }
+
+      function drawSceneCharacters() {
+        const characters = [
+          {
+            xRatio: sceneState.width < 620 ? 0.33 : 0.39,
+            heightScale: 1.12,
+            tilt: 0.026,
+            facing: -1,
+            type: "woman",
+            shadowOpacity: 0.16
+          },
+          {
+            xRatio: sceneState.width < 620 ? 0.67 : 0.61,
+            heightScale: 1.18,
+            tilt: -0.03,
+            facing: -1,
+            type: "man",
+            shadowOpacity: 0.34
+          }
+        ];
+
+        characters.forEach((character) => {
+          const baseX = sceneState.width * character.xRatio;
+          const baseY = getForegroundGroundY(baseX) + sceneState.height * 0.005;
+          const mobileCharacterScale = sceneState.width < 620 ? 1.28 : 1;
+          const figureHeight = clamp(
+            sceneState.height * 0.166 * character.heightScale * mobileCharacterScale,
+            72,
+            Math.min(
+              sceneState.height * (sceneState.width < 620 ? 0.31 : 0.225),
+              sceneState.width * (sceneState.width < 620 ? 0.21 : 0.118)
+            )
+          );
+          const unit = figureHeight / 100;
+          const sway = sceneState.reducedMotion
+            ? 0
+            : Math.sin(sceneState.sceneTime * 0.72 + character.xRatio * 11) * unit * 0.9;
+
+          drawFigureShadow(baseX, baseY + figureHeight * 0.02, figureHeight * 0.24, character.shadowOpacity);
+
+          sceneCtx.save();
+          sceneCtx.translate(baseX + sway, baseY);
+          sceneCtx.scale(unit * character.facing, unit);
+          sceneCtx.rotate(character.tilt);
+
+          if (character.type === "woman") {
+            drawWomanFigure();
+          } else {
+            drawManFigure();
+          }
+
+          sceneCtx.restore();
+        });
+      }
+
+      function drawTree() {
+        if (!sceneState.branchSegments.length) {
+          return;
+        }
+
+        const width = sceneState.width;
+        const height = sceneState.height;
+        const trunkWidth = sceneState.trunkNodes.length
+          ? sceneState.trunkNodes[0].width
+          : Math.max(34, width * 0.044);
+        const rootBaseY = sceneState.groundY + height * 0.132;
+        const treeMotionScale = width < 620 ? 0.34 : 0.58;
+        const windMultiplier = 1 + sceneState.effects.wind * (width < 620 ? 0.7 : 1.15);
+        const windBase = sceneState.reducedMotion
+          ? 0
+          : Math.sin(sceneState.sceneTime * (0.54 + sceneState.effects.wind * 0.18)) * width * 0.0012 * windMultiplier * treeMotionScale;
+
+        sceneCtx.save();
+        sceneCtx.fillStyle = "#090806";
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(sceneState.treeX - trunkWidth * 0.68, rootBaseY);
+        sceneCtx.quadraticCurveTo(
+          sceneState.treeX - trunkWidth * 1.06,
+          rootBaseY + height * 0.02,
+          sceneState.treeX - trunkWidth * 1.34,
+          rootBaseY + height * 0.045
+        );
+        sceneCtx.lineTo(sceneState.treeX - trunkWidth * 0.86, rootBaseY + height * 0.018);
+        sceneCtx.quadraticCurveTo(
+          sceneState.treeX - trunkWidth * 0.18,
+          rootBaseY - height * 0.01,
+          sceneState.treeX + trunkWidth * 0.12,
+          rootBaseY
+        );
+        sceneCtx.quadraticCurveTo(
+          sceneState.treeX + trunkWidth * 0.62,
+          rootBaseY + height * 0.03,
+          sceneState.treeX + trunkWidth * 1.36,
+          rootBaseY + height * 0.05
+        );
+        sceneCtx.lineTo(sceneState.treeX + trunkWidth * 0.52, rootBaseY + height * 0.01);
+        sceneCtx.quadraticCurveTo(
+          sceneState.treeX + trunkWidth * 0.12,
+          rootBaseY - height * 0.012,
+          sceneState.treeX - trunkWidth * 0.68,
+          rootBaseY
+        );
+        sceneCtx.fill();
+
+        sceneCtx.lineCap = "round";
+        sceneCtx.lineJoin = "round";
+
+        sceneState.branchSegments.forEach((segment) => {
+          const heightFactor = clamp((sceneState.groundY - segment.y2) / (height * 0.62), 0, 1);
+          const swayAmount = sceneState.reducedMotion
+            ? 0
+            : width * 0.0024 * segment.sway * heightFactor * treeMotionScale * (1 + sceneState.effects.wind * (width < 620 ? 0.8 : 1.2));
+          const swing = Math.sin(sceneState.sceneTime * (0.68 + segment.depth * 0.04 + sceneState.effects.wind * 0.08) + segment.phase) * swayAmount;
+          const lift = Math.cos(sceneState.sceneTime * (0.48 + segment.depth * 0.03) + segment.phase) * swayAmount * 0.16;
+          const startX = segment.x1 + windBase * (segment.isTrunk ? 0.18 : 0.34) + swing * (segment.isTrunk ? 0.08 : 0.24);
+          const startY = segment.y1 + lift * 0.18;
+          const endX = segment.x2 + windBase * (segment.isTrunk ? 0.34 : 0.9) + swing;
+          const endY = segment.y2 + lift - Math.abs(swing) * 0.05;
+          const dx = endX - startX;
+          const dy = endY - startY;
+          const length = Math.hypot(dx, dy) || 1;
+          const normalX = -dy / length;
+          const normalY = dx / length;
+          const curveOffset = Math.min(width * 0.014, segment.width * 0.55) * segment.bend * (segment.isTrunk ? 0.42 : 0.88);
+
+          sceneCtx.strokeStyle = segment.isTrunk ? "#0b0a08" : "#070605";
+          sceneCtx.lineWidth = Math.max(1.1, segment.width);
+          sceneCtx.beginPath();
+          sceneCtx.moveTo(startX, startY);
+          sceneCtx.quadraticCurveTo(
+            startX + dx * 0.52 + normalX * curveOffset,
+            startY + dy * 0.48 + normalY * curveOffset - Math.abs(curveOffset) * 0.08,
+            endX,
+            endY
+          );
+          sceneCtx.stroke();
+
+          if (segment.isTrunk && segment.width > width * 0.016) {
+            sceneCtx.strokeStyle = "rgba(232, 219, 196, 0.038)";
+            sceneCtx.lineWidth = Math.max(0.8, segment.width * 0.16);
+            sceneCtx.beginPath();
+            sceneCtx.moveTo(startX - normalX * segment.width * 0.08, startY - normalY * segment.width * 0.08);
+            sceneCtx.quadraticCurveTo(
+              startX + dx * 0.46 + normalX * curveOffset * 0.5,
+              startY + dy * 0.48 + normalY * curveOffset * 0.5,
+              endX - normalX * segment.width * 0.06,
+              endY - normalY * segment.width * 0.06
+            );
+            sceneCtx.stroke();
+          }
+        });
+
+        sceneCtx.restore();
+      }
+
+      function drawFallingLeaf(leaf) {
+        sceneCtx.save();
+        sceneCtx.translate(leaf.x, leaf.y);
+        sceneCtx.rotate(leaf.rotation);
+        sceneCtx.scale(0.72, 1.14);
+        sceneCtx.fillStyle = `rgba(0, 0, 0, ${leaf.alpha})`;
+        drawLeafSilhouette(leaf.size);
+        sceneCtx.restore();
+      }
+
+      function drawLeafSilhouette(size) {
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(0, -size);
+        sceneCtx.quadraticCurveTo(size * 0.88, -size * 0.2, 0, size);
+        sceneCtx.quadraticCurveTo(-size * 0.88, -size * 0.2, 0, -size);
+        sceneCtx.fill();
+      }
+
+      function drawLeaf(leaf) {
+        const sway = sceneState.reducedMotion
+          ? 0
+          : Math.sin(leaf.elapsed * leaf.swaySpeed + leaf.phase) * leaf.sway * (1 + sceneState.effects.wind * 2.2);
+
+        for (let bladeIndex = 0; bladeIndex < leaf.blades; bladeIndex += 1) {
+          const spread = leaf.blades === 1 ? 0 : bladeIndex / (leaf.blades - 1) - 0.5;
+          const bladeSize = leaf.size * (1 - Math.abs(spread) * 0.18) * (1 - bladeIndex * 0.05);
+
+          sceneCtx.save();
+          sceneCtx.translate(
+            leaf.x + spread * bladeSize * 1.05,
+            leaf.y + Math.abs(spread) * bladeSize * 0.1
+          );
+          sceneCtx.rotate(leaf.rotation + spread * 0.38 + sway * (0.8 + bladeIndex * 0.1));
+          sceneCtx.scale(
+            leaf.widthScale * (1 - Math.abs(spread) * 0.12),
+            leaf.stretch * (1 - bladeIndex * 0.06)
+          );
+          sceneCtx.translate(0, -bladeSize * 0.88);
+          sceneCtx.fillStyle = `rgba(0, 0, 0, ${Math.max(0.36, leaf.alpha - bladeIndex * 0.08)})`;
+          drawLeafSilhouette(bladeSize);
+          sceneCtx.restore();
+        }
+      }
+
+      function drawGrass(layer = "all") {
+        sceneState.leaves.forEach((leaf) => {
+          if (layer !== "all" && leaf.layer !== layer) {
+            return;
+          }
+
+          drawLeaf(leaf);
+        });
+      }
+
+      function drawFallingLeaves() {
+        if (!sceneState.effects.fallingLeavesEnabled) {
+          return;
+        }
+
+        sceneState.fallingLeaves.forEach((leaf) => {
+          drawFallingLeaf(leaf);
+        });
+      }
+
+      function drawWindOverlay() {
+        const wind = sceneState.effects.wind;
+        if (wind <= 0.04) {
+          return;
+        }
+
+        const streakCount = sceneState.reducedMotion
+          ? 4
+          : clamp(Math.round(sceneState.width / 95) + Math.round(wind * 12), 8, 22);
+        const strokeAlpha = 0.035 + wind * 0.055;
+
+        sceneCtx.save();
+        sceneCtx.lineCap = "round";
+
+        for (let index = 0; index < streakCount; index += 1) {
+          const phase = (sceneState.sceneTime * (0.18 + wind * 1.6) + index * 0.173) % 1;
+          const x = (-0.18 + phase * 1.48) * sceneState.width;
+          const y = sceneState.height * (0.14 + ((index * 0.09) % 0.62));
+          const length = sceneState.width * (0.08 + wind * 0.12) * (0.84 + (index % 3) * 0.12);
+          const arc = sceneState.height * (0.005 + wind * 0.012) * Math.sin(sceneState.sceneTime * 1.4 + index * 0.6);
+
+          sceneCtx.strokeStyle = `rgba(245, 247, 251, ${strokeAlpha.toFixed(3)})`;
+          sceneCtx.lineWidth = Math.max(1, sceneState.width * 0.001 * (0.9 + wind));
+          sceneCtx.beginPath();
+          sceneCtx.moveTo(x, y);
+          sceneCtx.quadraticCurveTo(
+            x + length * 0.42,
+            y + arc,
+            x + length,
+            y - sceneState.height * (0.014 + wind * 0.018)
+          );
+          sceneCtx.stroke();
+        }
+
+        sceneCtx.restore();
+      }
+
+      function drawRedRain() {
+        const rain = sceneState.effects.rain;
+        if (rain <= 0.02 || !sceneState.redRainDrops.length) {
+          return;
+        }
+
+        const slant = sceneState.width * (0.012 + sceneState.effects.wind * 0.026);
+        const speed = 0.42 + rain * 1.3;
+
+        sceneCtx.save();
+        sceneCtx.lineCap = "round";
+
+        sceneState.redRainDrops.forEach((drop, index) => {
+          const progress = (sceneState.sceneTime * drop.speed * speed + drop.phase) % 1.24;
+          const x = drop.x * sceneState.width + sceneState.width * drop.offset * 0.06 + progress * slant * 2.2;
+          const y = -sceneState.height * 0.18 + progress * sceneState.height * 1.34;
+          const length = sceneState.height * drop.length * (0.72 + rain * 0.75) * drop.depth;
+          const alpha = (drop.opacity * rain).toFixed(3);
+
+          sceneCtx.strokeStyle = `rgba(122, 0, 8, ${alpha})`;
+          sceneCtx.lineWidth = Math.max(1, sceneState.width * 0.0013 * drop.depth);
+          sceneCtx.beginPath();
+          sceneCtx.moveTo(x, y);
+          sceneCtx.lineTo(x - slant * drop.depth, y + length);
+          sceneCtx.stroke();
+
+          sceneCtx.strokeStyle = `rgba(232, 42, 30, ${(drop.opacity * 0.34 * rain).toFixed(3)})`;
+          sceneCtx.lineWidth = Math.max(0.5, sceneState.width * 0.0007 * drop.depth);
+          sceneCtx.beginPath();
+          sceneCtx.moveTo(x - slant * 0.08, y);
+          sceneCtx.lineTo(x - slant * drop.depth * 0.92, y + length);
+          sceneCtx.stroke();
+        });
+
+        sceneCtx.restore();
+      }
+
+      function drawGroundThings() {
+        const rise = sceneState.effects.groundRise;
+        if (rise <= 0.01 || !sceneState.groundThings.length) {
+          return;
+        }
+
+        sceneState.groundThings.forEach((thing, index) => {
+          const localRise = saturate(rise * 1.22 - index * 0.08);
+          if (localRise <= 0) {
+            return;
+          }
+
+          const x = sceneState.width * thing.x;
+          const baseY = getForegroundGroundY(x) + sceneState.height * 0.01;
+          const widthValue = sceneState.width * thing.width * (0.8 + localRise * 0.4);
+          const heightValue = sceneState.height * thing.height * localRise;
+          const sway = sceneState.reducedMotion
+            ? 0
+            : Math.sin(sceneState.sceneTime * 1.6 + thing.phase) * widthValue * 0.3;
+
+          sceneCtx.save();
+          sceneCtx.translate(x + sway, baseY);
+          sceneCtx.rotate(thing.lean * localRise);
+          sceneCtx.fillStyle = `rgba(7, 7, 8, ${(0.55 + localRise * 0.35).toFixed(3)})`;
+          sceneCtx.beginPath();
+          sceneCtx.moveTo(-widthValue * 0.56, 0);
+          sceneCtx.quadraticCurveTo(-widthValue * 0.64, -heightValue * 0.26, -widthValue * 0.42, -heightValue * 0.58);
+          sceneCtx.quadraticCurveTo(-widthValue * 0.32, -heightValue * 0.9, -widthValue * 0.14, -heightValue);
+          sceneCtx.quadraticCurveTo(-widthValue * 0.04, -heightValue * 0.7, 0, -heightValue * 0.56);
+          sceneCtx.quadraticCurveTo(widthValue * 0.04, -heightValue * 0.7, widthValue * 0.14, -heightValue);
+          sceneCtx.quadraticCurveTo(widthValue * 0.32, -heightValue * 0.9, widthValue * 0.42, -heightValue * 0.58);
+          sceneCtx.quadraticCurveTo(widthValue * 0.64, -heightValue * 0.26, widthValue * 0.56, 0);
+          sceneCtx.closePath();
+          sceneCtx.fill();
+
+          sceneCtx.strokeStyle = `rgba(32, 6, 6, ${(0.12 + localRise * 0.16).toFixed(3)})`;
+          sceneCtx.lineWidth = Math.max(1, widthValue * 0.16);
+          [-1, 0, 1].forEach((finger) => {
+            const fingerX = finger * thing.fingerSpread * sceneState.width;
+            sceneCtx.beginPath();
+            sceneCtx.moveTo(fingerX, -heightValue * 0.46);
+            sceneCtx.quadraticCurveTo(
+              fingerX + finger * widthValue * 0.14,
+              -heightValue * 0.82,
+              fingerX + finger * widthValue * 0.08,
+              -heightValue * (0.96 + Math.abs(finger) * 0.06)
+            );
+            sceneCtx.stroke();
+          });
+          sceneCtx.restore();
+        });
+      }
+
+      function drawLightningStrike() {
+        if (!sceneState.effects.lightning || sceneState.effects.lightning.flashPulse <= 0.01) {
+          return;
+        }
+
+        const { index, flashPulse } = sceneState.effects.lightning;
+        const boltOffsets = [-0.026, 0.014, -0.012, 0.022, -0.02, 0.016];
+        const startX = sceneState.treeX + sceneState.width * boltOffsets[index % boltOffsets.length];
+        const impactX = sceneState.treeX + sceneState.width * boltOffsets[index % boltOffsets.length] * 0.46;
+        const impactY = sceneState.groundY + sceneState.height * 0.03;
+        const segments = 7;
+
+        sceneCtx.save();
+        sceneCtx.globalCompositeOperation = "screen";
+        sceneCtx.strokeStyle = `rgba(255, 255, 255, ${(0.32 + flashPulse * 0.62).toFixed(3)})`;
+        sceneCtx.lineWidth = Math.max(2, sceneState.width * 0.0032 * (0.6 + flashPulse));
+        sceneCtx.shadowBlur = sceneState.width * 0.014 * (0.5 + flashPulse);
+        sceneCtx.shadowColor = "rgba(255, 255, 255, 0.8)";
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(startX, -sceneState.height * 0.06);
+
+        for (let step = 1; step < segments; step += 1) {
+          const progress = step / segments;
+          const wobble = Math.sin(index * 3.1 + step * 1.7) * sceneState.width * 0.008 * (1 - progress * 0.35);
+          const x = lerp(startX, impactX, progress) + wobble;
+          const y = lerp(-sceneState.height * 0.06, impactY, progress);
+          sceneCtx.lineTo(x, y);
+        }
+
+        sceneCtx.lineTo(impactX, impactY);
+        sceneCtx.stroke();
+
+        sceneCtx.fillStyle = `rgba(255, 255, 255, ${(0.06 + flashPulse * 0.14).toFixed(3)})`;
+        sceneCtx.beginPath();
+        sceneCtx.ellipse(impactX, impactY, sceneState.width * 0.06, sceneState.height * 0.025, 0, 0, Math.PI * 2);
+        sceneCtx.fill();
+        sceneCtx.restore();
+      }
+
+      function drawSceneOverlays() {
+        if (sceneState.effects.flash > 0.01) {
+          sceneCtx.fillStyle = `rgba(255, 255, 255, ${(sceneState.effects.flash * 0.26).toFixed(3)})`;
+          sceneCtx.fillRect(0, 0, sceneState.width, sceneState.height);
+        }
+
+        if (sceneState.effects.darkness > 0.001) {
+          sceneCtx.fillStyle = `rgba(0, 0, 0, ${saturate(sceneState.effects.darkness).toFixed(3)})`;
+          sceneCtx.fillRect(0, 0, sceneState.width, sceneState.height);
+
+          if (sceneState.effects.darkness >= 0.995) {
+            sceneCtx.fillStyle = "#000";
+          }
+
+          sceneCtx.fillRect(0, 0, sceneState.width, sceneState.height);
+        }
+      }
+
+      function drawScene() {
+        if (!sceneCtx) {
+          return;
+        }
+
+        sceneCtx.clearRect(0, 0, sceneState.width, sceneState.height);
+        sceneCtx.save();
+        sceneCtx.translate(sceneState.effects.shakeX, sceneState.effects.shakeY);
+
+        drawLayerWithParallax(18, 10, () => {
+          drawSky();
+          drawBackdropLight();
+        });
+
+        drawLayerWithParallax(24, 12, () => {
+          sceneState.clouds.forEach((cloud) => {
+            drawCloud(cloud);
+          });
+        });
+
+        drawLayerWithParallax(12, 6, () => {
+          drawAtmosphericMist("back");
+        });
+        drawLayerWithParallax(14, 7, () => {
+          drawWindOverlay();
+        });
+        drawLayerWithParallax(10, 5, () => {
+          drawTree();
+        });
+        drawLayerWithParallax(8, 4, () => {
+          drawGround();
+        });
+        drawLayerWithParallax(9, 4.5, () => {
+          drawSceneCharacters();
+        });
+        drawLayerWithParallax(8, 4, () => {
+          drawGrass("back");
+        });
+        drawLayerWithParallax(12, 6, () => {
+          drawFallingLeaves();
+        });
+        drawLayerWithParallax(14, 7, () => {
+          drawRedRain();
+        });
+        drawLayerWithParallax(10, 5, () => {
+          drawGroundThings();
+        });
+        drawLayerWithParallax(10, 5, () => {
+          drawLightningStrike();
+        });
+        drawLayerWithParallax(16, 8, () => {
+          drawAtmosphericMist("front");
+        });
+        drawLayerWithParallax(12, 5, () => {
+          drawGrass("front");
+        });
+        sceneCtx.restore();
+
+        drawSceneOverlays();
+      }
+
+      function animateScene(timestamp) {
+        if (!sceneCtx) {
+          return;
+        }
+
+        if (!sceneState.lastFrameTime) {
+          sceneState.lastFrameTime = timestamp;
+        }
+
+        const delta = Math.min((timestamp - sceneState.lastFrameTime) / 1000, 0.05);
+        sceneState.lastFrameTime = timestamp;
+
+        if (!sceneState.reducedMotion) {
+          sceneState.sceneTime += delta;
+          if (sceneState.parallaxEnabled) {
+            sceneState.pointer.x += (sceneState.pointer.targetX - sceneState.pointer.x) * 0.08;
+            sceneState.pointer.y += (sceneState.pointer.targetY - sceneState.pointer.y) * 0.08;
+          } else {
+            sceneState.pointer.x = 0.5;
+            sceneState.pointer.y = 0.5;
+          }
+        }
+
+        updateSceneEffects();
+        updateClouds(delta);
+        updateLeaves(delta);
+        updateFallingLeaves(delta);
+        drawScene();
+
+        sceneState.sceneFrameId = requestAnimationFrame(animateScene);
+      }
+
+      function updatePointerTarget(clientX, clientY) {
+        if (sceneState.reducedMotion || !sceneState.parallaxEnabled || !sceneState.width || !sceneState.height) {
+          return;
+        }
+
+        sceneState.pointer.targetX = clamp(clientX / sceneState.width, 0, 1);
+        sceneState.pointer.targetY = clamp(clientY / sceneState.height, 0, 1);
+      }
+
+      function resetPointerTarget() {
+        sceneState.pointer.targetX = 0.5;
+        sceneState.pointer.targetY = 0.5;
+      }
+
+      function initializeScene() {
+        if (!sceneCanvas || !sceneCtx) {
+          return;
+        }
+
+        seedClouds();
+        resizeScene();
+        sceneState.sceneTime = 0;
+        sceneState.pointer.x = 0.5;
+        sceneState.pointer.y = 0.5;
+        resetPointerTarget();
+        sceneState.lastFrameTime = 0;
+
+        if (sceneState.sceneFrameId !== null) {
+          cancelAnimationFrame(sceneState.sceneFrameId);
+        }
+
+        sceneState.sceneFrameId = requestAnimationFrame(animateScene);
+      }
+
+      function parseTimestamp(min, sec, msRaw) {
+        const ms = Number((msRaw || "0").padEnd(3, "0"));
+        return Number(min) * 60 + Number(sec) + ms / 1000;
+      }
+
+      function cleanWord(text) {
+        return String(text || "").replace(/\s+/g, " ").trim();
+      }
+
+      function parseLrc(rawText) {
+        const cleaned = rawText
+          .replace(/\r/g, "")
+          .replace(/\\\[/g, "[")
+          .replace(/\\\]/g, "]")
+          .replace(/\u00a0/g, " ");
+
+        const tokenPattern = /\[(\d{2}):(\d{2})(?:\.(\d{1,3}))?\]([^\[]*)/g;
+        const words = [];
+        let match = tokenPattern.exec(cleaned);
+
+        while (match) {
+          const text = cleanWord(match[4]);
+          if (text) {
+            words.push({
+              time: parseTimestamp(match[1], match[2], match[3]),
+              text
+            });
+          }
+          match = tokenPattern.exec(cleaned);
+        }
+
+        return words.sort((a, b) => a.time - b.time);
+      }
+
+      function isTripleDotLyric(text) {
+        return typeof text === "string" && text.replace(/\s+/g, "") === "...";
+      }
+
+      function showOverlay(show) {
+        overlayVisible = show;
+        document.body.classList.toggle("overlay-hidden", !show);
+      }
+
+      function setStatus(message, isError = false) {
+        statusText.textContent = message;
+        statusText.style.color = isError ? "#ff7a7a" : "#d0d0d0";
+        statusText.style.opacity = message ? "1" : "0";
+      }
+
+      function updateReadyState() {
+        if (sequenceLockedAfterEnding) {
+          startBtn.hidden = true;
+          startBtn.disabled = true;
+          setStatus("");
+          return;
+        }
+
+        if (lyricsLoaded) {
+          startBtn.disabled = false;
+          setStatus(`Listo. ${lyricWords.length} lineas cargadas.`);
+          return;
+        }
+
+        startBtn.disabled = true;
+        setStatus("Cargando timestamps...");
+      }
+
+      function findWordIndex(currentTime) {
+        let low = 0;
+        let high = lyricWords.length - 1;
+        let result = -1;
+
+        while (low <= high) {
+          const mid = Math.floor((low + high) / 2);
+          if (lyricWords[mid].time <= currentTime) {
+            result = mid;
+            low = mid + 1;
+          } else {
+            high = mid - 1;
+          }
+        }
+
+        return result;
+      }
+
+      function updateLyrics(currentTime, force = false) {
+        if (!lyricWords.length) {
+          return;
+        }
+
+        const nextIndex = findWordIndex(currentTime);
+        if (!force && nextIndex === activeWordIndex) {
+          return;
+        }
+
+        activeWordIndex = nextIndex;
+        if (nextIndex < 0) {
+          lyricEl.textContent = "";
+          lyricEl.classList.add("is-empty");
+          return;
+        }
+
+        const word = lyricWords[nextIndex].text;
+        const isDots = isTripleDotLyric(word);
+        const visibleWord = isDots ? "" : word;
+        lyricEl.textContent = visibleWord;
+        lyricEl.classList.toggle("is-empty", !visibleWord);
+
+        if (isDots && overlayVisible) {
+          showOverlay(false);
+        }
+      }
+
+      function resetLyrics() {
+        activeWordIndex = -1;
+        lyricEl.textContent = "";
+        lyricEl.classList.add("is-empty");
+      }
+
+      function stopSyncLoop() {
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+      }
+
+      function syncLoop() {
+        updateLyrics(audio.currentTime);
+        rafId = requestAnimationFrame(syncLoop);
+      }
+
+      function startSyncLoop() {
+        if (rafId === null) {
+          rafId = requestAnimationFrame(syncLoop);
+        }
+      }
+
+      async function startSequenceFromBeginning() {
+        if (!lyricWords.length) {
+          return;
+        }
+
+        sequenceLockedAfterEnding = false;
+        resetLyrics();
+        showOverlay(true);
+        audio.currentTime = 0;
+        updateLyrics(0, true);
+
+        try {
+          await audio.play();
+          startBtn.hidden = true;
+          setStatus("");
+          document.body.classList.add("sequence-started");
+        } catch (error) {
+          setStatus("No se pudo iniciar. Presiona de nuevo.", true);
+          console.error(error);
+        }
+      }
+
+      async function loadLyrics() {
+        try {
+          const response = await fetch(encodeURI(LRC_PATH));
+          if (!response.ok) {
+            throw new Error(`No se pudo cargar ${LRC_PATH}`);
+          }
+
+          const rawLrc = await response.text();
+          lyricWords = parseLrc(rawLrc);
+
+          if (!lyricWords.length) {
+            throw new Error("El archivo LRC no tiene timestamps validos.");
+          }
+
+          lyricsLoaded = true;
+          updateReadyState();
+
+          if (previewSceneOnly) {
+            startBtn.hidden = true;
+            document.body.classList.add("sequence-started");
+            showOverlay(false);
+            setStatus("");
+          }
+        } catch (error) {
+          lyricsLoaded = false;
+          startBtn.disabled = true;
+          lyricEl.textContent = "Error";
+          lyricEl.classList.remove("is-empty");
+          setStatus("No se pudo cargar el LRC. Usa un servidor local.", true);
+          console.error(error);
+        }
+      }
+
+      startBtn.addEventListener("click", async () => {
+        await startSequenceFromBeginning();
+      });
+
+      audio.addEventListener("timeupdate", () => {
+        updateLyrics(audio.currentTime);
+      });
+
+      audio.addEventListener("play", () => {
+        startSyncLoop();
+      });
+
+      audio.addEventListener("pause", () => {
+        stopSyncLoop();
+      });
+
+      audio.addEventListener("seeked", () => {
+        updateLyrics(audio.currentTime, true);
+      });
+
+      audio.addEventListener("ended", () => {
+        stopSyncLoop();
+        resetLyrics();
+        setStatus("");
+        if (hasPermanentEndingReached(audio.currentTime)) {
+          sequenceLockedAfterEnding = true;
+          startBtn.hidden = true;
+          startBtn.disabled = true;
+          showOverlay(true);
+          document.body.classList.add("sequence-started");
+          updateReadyState();
+          return;
+        }
+
+        startBtn.hidden = false;
+        showOverlay(true);
+        document.body.classList.remove("sequence-started");
+      });
+
+      window.addEventListener("resize", () => {
+        resizeScene();
+      });
+
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", () => {
+          resizeScene();
+        });
+      }
+
+      window.addEventListener("pointermove", (event) => {
+        updatePointerTarget(event.clientX, event.clientY);
+      });
+
+      window.addEventListener("pointerleave", () => {
+        resetPointerTarget();
+      });
+
+      window.addEventListener("blur", () => {
+        resetPointerTarget();
+      });
+
+      initializeScene();
+      showOverlay(true);
+      updateReadyState();
+      loadLyrics();
+    </script>
+  </body>
+</html>

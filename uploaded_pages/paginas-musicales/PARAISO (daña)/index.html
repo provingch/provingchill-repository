@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PARAISO (daña) - Karaoke</title>
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+        color: #fff;
+        font-family: "Arial Black", "Impact", sans-serif;
+        transition: none;
+      }
+
+      body.effect-default {
+        background: #000;
+        color: #fff;
+      }
+
+      body.effect-cielo {
+        background: #0d1421;
+        color: #fff;
+      }
+
+      body.effect-tiempo {
+        background: #111;
+        color: #fff;
+      }
+
+      body.effect-ma {
+        background: #000;
+        color: #fff;
+      }
+
+      body.effect-matarme {
+        background: #d10000;
+        color: #fff;
+      }
+
+      body.effect-milky {
+        background: #07051a;
+        color: #fff;
+      }
+
+      body.effect-starwarp {
+        background: #05040f;
+        color: #fff;
+      }
+
+      body.effect-invert-light {
+        background: #fff;
+        color: #000;
+      }
+
+      body.effect-invert-dark {
+        background: #000;
+        color: #fff;
+      }
+
+      .fx-video {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0;
+        pointer-events: none;
+        transition: none;
+        z-index: 0;
+      }
+
+      body.effect-cielo #sky-video {
+        opacity: 1;
+      }
+
+      body.effect-tiempo #clock-video {
+        opacity: 1;
+      }
+
+      body.effect-milky #milky-video {
+        opacity: 1;
+      }
+
+      body.effect-starwarp #milky-video {
+        opacity: 0;
+        animation: none;
+      }
+
+      #wave-overlay {
+        position: fixed;
+        inset: -18%;
+        overflow: hidden;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 1;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.02));
+        transition: none;
+      }
+
+      #wave-overlay::before,
+      #wave-overlay::after {
+        content: "";
+        position: absolute;
+        inset: -24%;
+        pointer-events: none;
+        background:
+          radial-gradient(
+            120% 52% at 50% 100%,
+            transparent 63%,
+            rgba(151, 228, 255, 0.40) 64%,
+            transparent 67%
+          ) 0 0 / 100% 24% repeat-y;
+        mix-blend-mode: screen;
+      }
+
+      #wave-overlay::after {
+        opacity: 0.7;
+        background:
+          radial-gradient(
+            125% 52% at 50% 100%,
+            transparent 63%,
+            rgba(255, 255, 255, 0.32) 64%,
+            transparent 67%
+          ) 0 10% / 100% 24% repeat-y;
+      }
+
+      body.wave-on #wave-overlay {
+        opacity: 0.72;
+      }
+
+      body.wave-on #wave-overlay::before {
+        animation: wave-flow-a 3.6s linear infinite;
+      }
+
+      body.wave-on #wave-overlay::after {
+        animation: wave-flow-b 4.8s linear infinite reverse;
+      }
+
+      #beat-frame {
+        position: fixed;
+        inset: 10px;
+        border-radius: 12px;
+        border: 1px solid transparent;
+        pointer-events: none;
+        opacity: 0;
+        z-index: 2;
+        transform-origin: center;
+        overflow: visible;
+      }
+
+      #beat-frame::before,
+      #beat-frame::after {
+        content: "";
+        position: absolute;
+        pointer-events: none;
+        border-radius: inherit;
+        opacity: 0;
+      }
+
+      #beat-frame::before {
+        inset: 0;
+        border: 2px solid #ffffffd8;
+        filter: blur(1px);
+      }
+
+      #beat-frame::after {
+        inset: -12px;
+        border: 2px solid #ffffff88;
+        filter: blur(8px);
+      }
+
+      body.beat-a #beat-frame,
+      body.beat-b #beat-frame {
+        opacity: 1;
+        border-color: #ffffff;
+        animation: beat-shell 0.4s linear infinite;
+      }
+
+      body.beat-c #beat-frame {
+        opacity: 1;
+        border-color: #ffffff;
+        animation: beat-shell 0.4s linear infinite;
+      }
+
+      body.beat-a #beat-frame::before,
+      body.beat-b #beat-frame::before,
+      body.beat-c #beat-frame::before {
+        opacity: 1;
+        animation: beat-core 0.4s linear infinite;
+      }
+
+      body.beat-a #beat-frame::after,
+      body.beat-b #beat-frame::after,
+      body.beat-c #beat-frame::after {
+        opacity: 1;
+        animation: beat-halo 0.4s linear infinite;
+      }
+
+      #balls-layer {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0;
+        transition: none;
+      }
+
+      #balls-layer.active {
+        opacity: 1;
+      }
+
+      .ball {
+        position: absolute;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, #ffffffd6, #7b6cffaa 42%, #1c11366e 72%, #00000000 100%);
+        filter: blur(0.4px);
+        animation: ball-drift var(--dur, 3.2s) ease-in-out infinite alternate;
+      }
+
+      #balls-layer.paused .ball {
+        animation-play-state: paused;
+      }
+
+      #float-layer {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      #star-overlay {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0;
+        background:
+          radial-gradient(circle at 20% 18%, #ffffff 0 1px, transparent 1.9px) 0 0 / 180px 180px,
+          radial-gradient(circle at 64% 42%, rgba(180, 214, 255, 0.9) 0 1.2px, transparent 2px) 0 0 / 230px 230px,
+          radial-gradient(circle at 88% 75%, rgba(255, 255, 255, 0.95) 0 1.4px, transparent 2.1px) 0 0 / 260px 260px,
+          linear-gradient(180deg, rgba(28, 34, 70, 0.45), rgba(5, 8, 20, 0.7));
+        transition: none;
+      }
+
+      #star-overlay::before,
+      #star-overlay::after {
+        content: "";
+        position: absolute;
+        inset: -16%;
+        pointer-events: none;
+      }
+
+      #star-overlay::before {
+        background:
+          radial-gradient(circle at 12% 22%, rgba(255, 255, 255, 0.95) 0 1px, transparent 2px) 0 0 / 120px 120px,
+          radial-gradient(circle at 70% 66%, rgba(170, 208, 255, 0.85) 0 1px, transparent 2px) 0 0 / 140px 140px;
+        opacity: 0.82;
+      }
+
+      #star-overlay::after {
+        background:
+          radial-gradient(circle at 30% 40%, rgba(255, 255, 255, 0.95) 0 1.2px, transparent 2.2px) 0 0 / 160px 160px,
+          radial-gradient(circle at 80% 30%, rgba(200, 226, 255, 0.85) 0 1.2px, transparent 2.2px) 0 0 / 180px 180px;
+        opacity: 0.7;
+      }
+
+      body.effect-starwarp #star-overlay {
+        opacity: 1;
+        animation: star-shader 3.8s ease-in-out infinite alternate;
+      }
+
+      body.effect-starwarp #star-overlay::before {
+        animation: star-drift-a 5s linear infinite alternate;
+      }
+
+      body.effect-starwarp #star-overlay::after {
+        animation: star-drift-b 6.6s linear infinite alternate;
+      }
+
+      .float-text {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        margin: 0;
+        transform: translate(-50%, -50%);
+        color: #fff;
+        font-family: "Arial Black", "Impact", sans-serif;
+        font-size: 2rem;
+        opacity: var(--from-opacity, 0.7);
+        animation: float-fade var(--life, 1200ms) ease-out forwards;
+        text-shadow: 0 0 14px #000;
+      }
+
+      .float-text.ghost-ts {
+        color: rgba(255, 255, 255, 0.78);
+      }
+
+      .float-text.ay-burst {
+        color: #fff;
+        text-transform: uppercase;
+        text-shadow: 0 0 12px #ffd966;
+      }
+
+      .stage {
+        position: relative;
+        z-index: 3;
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.35rem;
+      }
+
+      .start-btn {
+        font: inherit;
+        font-size: 0.95rem;
+        font-weight: 700;
+        border: 1px solid #fff;
+        background: #000;
+        color: #fff;
+        padding: 10px 18px;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: background-color 0.2s ease, color 0.2s ease;
+      }
+
+      .start-btn:disabled {
+        opacity: 0.4;
+        cursor: wait;
+      }
+
+      .start-btn:hover:not(:disabled) {
+        background: #fff;
+        color: #000;
+      }
+
+      .lyric {
+        margin: 0;
+        min-height: 1.1em;
+        font-size: clamp(1.7rem, 9.2vw, 6.4rem);
+        line-height: 1.02;
+        letter-spacing: 0.02em;
+        text-align: center;
+        padding: 0.06em 0.16em;
+        color: inherit;
+        background: transparent;
+        transition: none;
+        text-wrap: balance;
+      }
+
+      .lyric.word-hidden {
+        opacity: 0;
+      }
+
+      .lyric.edge-mode {
+        position: fixed;
+        z-index: 3;
+        max-width: min(48vw, 760px);
+      }
+
+      .lyric.edge-top {
+        top: 4vh;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .lyric.edge-bottom {
+        bottom: 14vh;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .lyric.edge-left {
+        left: 2.4vw;
+        top: 50%;
+        transform: translateY(-50%);
+        text-align: left;
+      }
+
+      .lyric.edge-right {
+        right: 2.4vw;
+        top: 50%;
+        transform: translateY(-50%);
+        text-align: right;
+      }
+
+      .word-cielo {
+        color: #000;
+      }
+
+      .word-tiempo {
+        color: #fff;
+      }
+
+      .word-ma {
+        color: #ff2020;
+      }
+
+      .word-matarme {
+        color: #000;
+      }
+
+      .word-dana {
+        color: #ff1f1f;
+      }
+
+      .word-dana-soft {
+        color: rgba(255, 31, 31, 0.56);
+      }
+
+      .word-arte {
+        color: #ffd84b;
+      }
+
+      .word-tarde {
+        color: #ff6ed8;
+      }
+
+      .word-violet {
+        color: #b784ff;
+      }
+
+      .word-hacer {
+        color: #b784ff;
+      }
+
+      .word-bien-bright {
+        color: #35e578;
+      }
+
+      .word-bien-dark {
+        color: #1f8f47;
+      }
+
+      .word-amor {
+        color: #ff3030;
+      }
+
+      .word-ts-normal {
+        font-size: clamp(1.7rem, 9vw, 6rem);
+      }
+
+      .word-ts-small {
+        font-size: clamp(1.2rem, 6.2vw, 4.2rem);
+        opacity: 0.72;
+      }
+
+      .ey-1 {
+        font-size: clamp(1.7rem, 9.2vw, 6.4rem);
+        opacity: 1;
+      }
+
+      .ey-2 {
+        font-size: clamp(1.2rem, 6.4vw, 4.4rem);
+        opacity: 0.72;
+      }
+
+      .ey-3 {
+        font-size: clamp(0.95rem, 4.8vw, 3.2rem);
+        opacity: 0.44;
+      }
+
+      .ey-4 {
+        font-size: clamp(0.7rem, 3.4vw, 2.2rem);
+        opacity: 0.18;
+      }
+
+      body.effect-invert-light .lyric {
+        color: #000;
+      }
+
+      body.effect-invert-dark .lyric {
+        color: #fff;
+      }
+
+      .status {
+        margin: 0;
+        min-height: 1em;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.9rem;
+        letter-spacing: 0.02em;
+        color: #d0d0d0;
+        transition: none;
+      }
+
+      audio {
+        display: none;
+      }
+
+      @keyframes star-shader {
+        0% {
+          transform: scale(1) translateY(0);
+          filter: brightness(1) contrast(1);
+        }
+        100% {
+          transform: scale(1.26) translateY(3%);
+          filter: brightness(1.65) contrast(1.22);
+        }
+      }
+
+      @keyframes star-drift-a {
+        0% {
+          transform: translate3d(0, 0, 0) scale(1);
+          opacity: 0.52;
+        }
+        100% {
+          transform: translate3d(-1.4%, 4.6%, 0) scale(1.22);
+          opacity: 0.94;
+        }
+      }
+
+      @keyframes star-drift-b {
+        0% {
+          transform: translate3d(0, 0, 0) scale(1);
+          opacity: 0.56;
+        }
+        100% {
+          transform: translate3d(2.1%, 5.1%, 0) scale(1.25);
+          opacity: 0.9;
+        }
+      }
+
+      @keyframes wave-flow-a {
+        0% {
+          transform: translate3d(0, 0, 0);
+        }
+        100% {
+          transform: translate3d(0, -24%, 0);
+        }
+      }
+
+      @keyframes wave-flow-b {
+        0% {
+          transform: translate3d(0, 0, 0);
+        }
+        100% {
+          transform: translate3d(0, -20%, 0);
+        }
+      }
+
+      @keyframes beat-shell {
+        0% {
+          transform: scale(0.982);
+          box-shadow: 0 0 6px #ffffff66, inset 0 0 6px #ffffff44;
+        }
+        50% {
+          transform: scale(1.055);
+          box-shadow: 0 0 26px #ffffffde, inset 0 0 16px #ffffffaa;
+        }
+        100% {
+          transform: scale(0.982);
+          box-shadow: 0 0 6px #ffffff66, inset 0 0 6px #ffffff44;
+        }
+      }
+
+      @keyframes beat-core {
+        0% {
+          transform: scale(0.985);
+          box-shadow: 0 0 8px #ffffff99;
+        }
+        50% {
+          transform: scale(1.05);
+          box-shadow: 0 0 30px #ffffffee;
+        }
+        100% {
+          transform: scale(0.985);
+          box-shadow: 0 0 8px #ffffff99;
+        }
+      }
+
+      @keyframes beat-halo {
+        0% {
+          transform: scale(0.97);
+          box-shadow: 0 0 14px #ffffff88;
+        }
+        50% {
+          transform: scale(1.085);
+          box-shadow: 0 0 44px #ffffffdd;
+        }
+        100% {
+          transform: scale(0.97);
+          box-shadow: 0 0 14px #ffffff88;
+        }
+      }
+
+      @keyframes ball-drift {
+        0% {
+          transform: translate3d(0, 0, 0);
+        }
+        50% {
+          transform: translate3d(var(--dx, 28px), var(--dy, -25px), 0);
+        }
+        100% {
+          transform: translate3d(calc(var(--dx, 28px) * -0.35), calc(var(--dy, -25px) * -0.35), 0);
+        }
+      }
+
+      @keyframes float-fade {
+        0% {
+          opacity: var(--from-opacity, 0.7);
+          transform: translate(-50%, -50%) scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, calc(-50% - 22px)) scale(0.84);
+        }
+      }
+    </style>
+  </head>
+  <body class="effect-default">
+    <video id="sky-video" class="fx-video" muted loop playsinline preload="auto">
+      <source src="media/cielo.mp4" type="video/mp4">
+    </video>
+    <video id="clock-video" class="fx-video" muted loop playsinline preload="auto">
+      <source src="media/reloj.mp4" type="video/mp4">
+    </video>
+    <video id="milky-video" class="fx-video" muted loop playsinline preload="auto">
+      <source src="media/via-lactea.mp4" type="video/mp4">
+    </video>
+
+    <div id="wave-overlay"></div>
+    <div id="star-overlay"></div>
+    <div id="balls-layer"></div>
+    <div id="float-layer"></div>
+    <div id="beat-frame"></div>
+
+    <main class="stage">
+      <button id="start-btn" class="start-btn" disabled>Comenzar secuencia</button>
+      <p id="lyric" class="lyric">...</p>
+      <p id="status" class="status">Cargando timestamps...</p>
+
+      <audio id="audio" preload="auto">
+        <source src="media/paraiso.mp3" type="audio/mpeg">
+        Tu navegador no soporta audio HTML5.
+      </audio>
+    </main>
+
+    <script>
+      const audio = document.getElementById("audio");
+      const skyVideo = document.getElementById("sky-video");
+      const clockVideo = document.getElementById("clock-video");
+      const milkyVideo = document.getElementById("milky-video");
+      const starOverlay = document.getElementById("star-overlay");
+      const ballsLayer = document.getElementById("balls-layer");
+      const floatLayer = document.getElementById("float-layer");
+
+      const startBtn = document.getElementById("start-btn");
+      const lyricEl = document.getElementById("lyric");
+      const statusText = document.getElementById("status");
+
+      const LRC_PATH = "media/paraiso-lyrics.lrc";
+      const EFFECT_CLASSES = [
+        "effect-default",
+        "effect-cielo",
+        "effect-tiempo",
+        "effect-ma",
+        "effect-matarme",
+        "effect-milky",
+        "effect-starwarp",
+        "effect-invert-light",
+        "effect-invert-dark"
+      ];
+      const EDGE_CLASSES = ["edge-top", "edge-right", "edge-bottom", "edge-left"];
+      const FINAL_EY_TIMES = [283.67, 284.60, 285.00, 285.39];
+
+      const RANGES = {
+        beatA: [42.34, 54.29],
+        beatB: [69.31, 73.43],
+        beatC: [76.09, 80.48],
+        milky: [83.65, 84.90],
+        invertA: [84.85, 87.37],
+        wave: [96.24, 108.76],
+        invertB: [137.31, 139.18],
+        starWarpEarly: [112.20, 115.40],
+        starWarp: [150.59, 154.20],
+        starWarpNow: [112.20, 114.60],
+        balls: [177.71, 187.93],
+        ballsPauses: [
+          [180.36, 181.41],
+          [184.08, 185.28],
+          [187.93, 189.25]
+        ],
+        tsScatter: [192.97, 199.22],
+        skyAgain: [208.33, 225.57],
+        edgeText: [256.57, 285.39]
+      };
+
+      let lyricWords = [];
+      let activeWordIndex = -1;
+      let rafId = null;
+
+      let currentBaseEffect = "effect-default";
+      let currentSceneEffect = "effect-default";
+      let currentEdgeClass = "";
+
+      let ballsNodes = [];
+      let ballsIntervalId = null;
+      let nextTsScatterAt = 0;
+      let invertAStartIndex = 0;
+      let invertBStartIndex = 0;
+      let ayPatternTimers = [];
+
+      function parseTimestamp(min, sec, msRaw) {
+        const ms = Number((msRaw || "0").padEnd(3, "0"));
+        return Number(min) * 60 + Number(sec) + ms / 1000;
+      }
+
+      function cleanWord(text) {
+        return text
+          .replace(/\s+/g, " ")
+          .replace(/\s+([,.;:!?])/g, "$1")
+          .trim();
+      }
+
+      function normalizeWord(text) {
+        return text
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9ñ]+/g, "");
+      }
+
+      function dotCount(text) {
+        const match = text.trim().match(/^\.+$/);
+        return match ? match[0].length : 0;
+      }
+
+      function inRange(time, range) {
+        return time >= range[0] && time <= range[1];
+      }
+
+      function near(value, target, tolerance = 0.07) {
+        return Math.abs(value - target) <= tolerance;
+      }
+
+      function randomBetween(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
+      function escapeHtml(text) {
+        return text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function setSceneEffect(className) {
+        if (className === currentSceneEffect) {
+          return;
+        }
+
+        document.body.classList.remove(...EFFECT_CLASSES);
+        document.body.classList.add(className);
+        currentSceneEffect = className;
+      }
+
+      function clearEdgePlacement() {
+        lyricEl.classList.remove("edge-mode", ...EDGE_CLASSES);
+        currentEdgeClass = "";
+      }
+
+      function pickRandomEdge(previous) {
+        const pool = EDGE_CLASSES.filter((edge) => edge !== previous);
+        return pool[Math.floor(Math.random() * pool.length)] || EDGE_CLASSES[0];
+      }
+
+      function renderWordHtml(rawText) {
+        let html = escapeHtml(rawText);
+        html = html.replace(/(hacer)/i, '<span class="word-hacer">$1</span>');
+        return html;
+      }
+
+      function restartVideo(video) {
+        try {
+          video.currentTime = 0;
+          video.play().catch(() => {});
+        } catch (_) {
+          // No-op
+        }
+      }
+
+      function getFinalEyClassByTime(time) {
+        const idx = FINAL_EY_TIMES.findIndex((mark) => near(time, mark, 0.06));
+        if (idx === -1) {
+          return "";
+        }
+        return `ey-${idx + 1}`;
+      }
+
+      function applyWordStyle(wordObj) {
+        lyricEl.className = "lyric";
+        currentBaseEffect = "effect-default";
+
+        const raw = wordObj.text.trim();
+        const normalized = normalizeWord(raw);
+        const dots = dotCount(raw);
+
+        if (dots >= 3) {
+          lyricEl.textContent = raw;
+          lyricEl.classList.add("word-hidden");
+          return;
+        }
+
+        lyricEl.innerHTML = renderWordHtml(raw);
+
+        if (normalized === "cielo") {
+          lyricEl.classList.add("word-cielo");
+          currentBaseEffect = "effect-cielo";
+          return;
+        }
+
+        if (normalized === "tiempo") {
+          lyricEl.classList.add("word-tiempo");
+          currentBaseEffect = "effect-tiempo";
+          restartVideo(clockVideo);
+          return;
+        }
+
+        if (normalized === "ma") {
+          lyricEl.classList.add("word-ma");
+          currentBaseEffect = "effect-ma";
+          return;
+        }
+
+        if (normalized === "matarme") {
+          lyricEl.classList.add("word-matarme");
+          currentBaseEffect = "effect-matarme";
+          return;
+        }
+
+        if (normalized === "dana") {
+          lyricEl.classList.add(/\.$/.test(raw) ? "word-dana-soft" : "word-dana");
+          return;
+        }
+
+        if (normalized === "arte") {
+          lyricEl.classList.add("word-arte");
+        }
+
+        if (normalized === "tarde") {
+          lyricEl.classList.add("word-tarde");
+        }
+
+        if (["extrana", "espana", "acaricia"].includes(normalized)) {
+          lyricEl.classList.add("word-violet");
+        }
+
+        if (normalized === "bien") {
+          lyricEl.classList.add(raw.startsWith("Bien") ? "word-bien-bright" : "word-bien-dark");
+        }
+
+        if (normalized === "amor") {
+          lyricEl.classList.add("word-amor");
+        }
+
+        if (normalized === "ts") {
+          if (near(wordObj.time, 191.91, 0.03)) {
+            lyricEl.classList.add("word-ts-normal");
+          }
+          if (near(wordObj.time, 192.44, 0.03)) {
+            lyricEl.classList.add("word-ts-small");
+          }
+        }
+
+        if (normalized === "ey") {
+          const eyClass = getFinalEyClassByTime(wordObj.time);
+          if (eyClass) {
+            lyricEl.classList.add(eyClass);
+          }
+        }
+      }
+
+      function parseLrc(rawText) {
+        const cleaned = rawText
+          .replace(/\r/g, "")
+          .replace(/\\\[/g, "[")
+          .replace(/\\\]/g, "]")
+          .replace(/\u00a0/g, " ");
+
+        const tokenPattern = /\[(\d{2}):(\d{2})(?:\.(\d{1,3}))?\]([^\[]*)/g;
+        const words = [];
+        let match = tokenPattern.exec(cleaned);
+
+        while (match) {
+          const text = cleanWord(match[4]);
+          if (text) {
+            words.push({
+              time: parseTimestamp(match[1], match[2], match[3]),
+              text
+            });
+          }
+          match = tokenPattern.exec(cleaned);
+        }
+
+        return words.sort((a, b) => a.time - b.time);
+      }
+
+      function setStatus(message, isError = false) {
+        statusText.textContent = message;
+        statusText.style.opacity = message ? "1" : "0";
+        statusText.style.color = isError ? "#ff6a6a" : "#d0d0d0";
+      }
+
+      function findWordIndex(currentTime) {
+        let low = 0;
+        let high = lyricWords.length - 1;
+        let result = -1;
+
+        while (low <= high) {
+          const mid = Math.floor((low + high) / 2);
+          if (lyricWords[mid].time <= currentTime) {
+            result = mid;
+            low = mid + 1;
+          } else {
+            high = mid - 1;
+          }
+        }
+
+        return result;
+      }
+
+      function initBalls() {
+        ballsLayer.innerHTML = "";
+        ballsNodes = [];
+
+        for (let i = 0; i < 12; i += 1) {
+          const ball = document.createElement("div");
+          ball.className = "ball";
+          ballsLayer.appendChild(ball);
+          ballsNodes.push(ball);
+          randomizeBall(ball, true);
+        }
+      }
+
+      function randomizeBall(ball, initial = false) {
+        const size = randomBetween(18, 120);
+        const left = randomBetween(2, 95);
+        const top = randomBetween(4, 94);
+        const dx = randomBetween(-60, 60);
+        const dy = randomBetween(-45, 45);
+        const duration = randomBetween(2, 4.6);
+        const opacity = randomBetween(0.14, 0.6);
+
+        ball.style.width = `${size}px`;
+        ball.style.height = `${size}px`;
+        ball.style.left = `${left}%`;
+        ball.style.top = `${top}%`;
+        ball.style.opacity = opacity.toFixed(2);
+        ball.style.setProperty("--dx", `${dx}px`);
+        ball.style.setProperty("--dy", `${dy}px`);
+        ball.style.setProperty("--dur", `${duration.toFixed(2)}s`);
+
+        if (initial) {
+          ball.style.animationDelay = `${randomBetween(-2.6, 0).toFixed(2)}s`;
+        }
+      }
+
+      function setBallsState(active, paused) {
+        ballsLayer.classList.toggle("active", active);
+        ballsLayer.classList.toggle("paused", active && paused);
+
+        if (active) {
+          if (ballsIntervalId === null) {
+            ballsIntervalId = window.setInterval(() => {
+              if (ballsLayer.classList.contains("paused")) {
+                return;
+              }
+              ballsNodes.forEach((ball) => randomizeBall(ball));
+            }, 900);
+          }
+        } else if (ballsIntervalId !== null) {
+          window.clearInterval(ballsIntervalId);
+          ballsIntervalId = null;
+        }
+      }
+
+      function spawnFloatingText(text, options = {}) {
+        const node = document.createElement("span");
+        node.className = `float-text ${options.className || ""}`.trim();
+        node.textContent = text;
+
+        const left = options.left ?? randomBetween(6, 94);
+        const top = options.top ?? randomBetween(8, 92);
+        node.style.left = `${left}%`;
+        node.style.top = `${top}%`;
+
+        if (options.size) {
+          node.style.fontSize = options.size;
+        }
+
+        if (typeof options.opacity === "number") {
+          node.style.setProperty("--from-opacity", String(options.opacity));
+        }
+
+        const life = options.lifeMs ?? 1300;
+        node.style.setProperty("--life", `${life}ms`);
+
+        floatLayer.appendChild(node);
+        window.setTimeout(() => {
+          node.remove();
+        }, life + 80);
+      }
+
+      function spawnAyBurst() {
+        ayPatternTimers.forEach((id) => window.clearTimeout(id));
+        ayPatternTimers = [];
+
+        const patternDelays = [0, 400, 800, 1200, 3200, 3600, 4000, 4400];
+        patternDelays.forEach((delayMs) => {
+          const id = window.setTimeout(() => {
+            if (audio.paused) {
+              return;
+            }
+
+            spawnFloatingText("ay", {
+              className: "ay-burst",
+              lifeMs: 980,
+              size: `${randomBetween(1.15, 2.45).toFixed(2)}rem`,
+              opacity: randomBetween(0.4, 0.92)
+            });
+          }, delayMs);
+
+          ayPatternTimers.push(id);
+        });
+      }
+
+      function spawnTsScatter() {
+        const rect = lyricEl.getBoundingClientRect();
+        const anchorX = ((rect.left + rect.right) / 2 / window.innerWidth) * 100;
+        const anchorY = ((rect.top + rect.bottom) / 2 / window.innerHeight) * 100;
+        const nearX = Math.max(12, Math.min(88, anchorX + randomBetween(-10, 10)));
+        const nearY = Math.max(12, Math.min(88, anchorY + randomBetween(-8, 8)));
+
+        spawnFloatingText("ts", {
+          className: "ghost-ts",
+          lifeMs: 900,
+          size: `${randomBetween(1, 1.6).toFixed(2)}rem`,
+          opacity: randomBetween(0.32, 0.72),
+          left: nearX,
+          top: nearY
+        });
+      }
+
+      function applyEdgePlacement(effectiveTime, wordObj, wordChanged) {
+        const edgeActive = inRange(effectiveTime, RANGES.edgeText);
+        const normalized = wordObj ? normalizeWord(wordObj.text) : "";
+        const excluded =
+          normalized === "eh" ||
+          normalized === "ey" ||
+          (wordObj && dotCount(wordObj.text) >= 3);
+
+        if (!edgeActive || !wordObj || excluded) {
+          clearEdgePlacement();
+          return;
+        }
+
+        lyricEl.classList.add("edge-mode");
+
+        if (wordChanged || !currentEdgeClass) {
+          currentEdgeClass = pickRandomEdge(currentEdgeClass);
+        }
+
+        lyricEl.classList.remove(...EDGE_CLASSES);
+        lyricEl.classList.add(currentEdgeClass);
+      }
+
+      function applyTimelineEffects(effectiveTime, wordObj, indexChanged, currentIndex) {
+        const inInvertA = inRange(effectiveTime, RANGES.invertA);
+        const inInvertB = inRange(effectiveTime, RANGES.invertB);
+
+        let scene = currentBaseEffect;
+
+        if (inInvertA || inInvertB) {
+          const baseIndex = inInvertA ? invertAStartIndex : invertBStartIndex;
+          const relativeIndex = Math.max(0, currentIndex - baseIndex);
+          const isLight = relativeIndex % 2 === 0;
+          scene = isLight ? "effect-invert-light" : "effect-invert-dark";
+        } else if (
+          inRange(effectiveTime, RANGES.starWarp) ||
+          inRange(effectiveTime, RANGES.starWarpEarly) ||
+          inRange(effectiveTime, RANGES.starWarpNow)
+        ) {
+          scene = "effect-starwarp";
+        } else if (inRange(effectiveTime, RANGES.milky)) {
+          scene = "effect-milky";
+        } else if (inRange(effectiveTime, RANGES.skyAgain)) {
+          scene = "effect-cielo";
+        }
+
+        setSceneEffect(scene);
+
+        document.body.classList.toggle("beat-a", inRange(effectiveTime, RANGES.beatA));
+        document.body.classList.toggle("beat-b", inRange(effectiveTime, RANGES.beatB));
+        document.body.classList.toggle("beat-c", inRange(effectiveTime, RANGES.beatC));
+        document.body.classList.toggle("wave-on", inRange(effectiveTime, RANGES.wave));
+
+        const ballsActive = inRange(effectiveTime, RANGES.balls);
+        const ballsPaused = ballsActive && RANGES.ballsPauses.some((range) => inRange(effectiveTime, range));
+        setBallsState(ballsActive, ballsPaused);
+
+        const tsActive = inRange(effectiveTime, RANGES.tsScatter);
+        if (tsActive && effectiveTime >= nextTsScatterAt) {
+          spawnTsScatter();
+          nextTsScatterAt = effectiveTime + 0.5;
+        }
+        if (!tsActive) {
+          nextTsScatterAt = 0;
+        }
+
+        if (indexChanged && wordObj) {
+          const dots = dotCount(wordObj.text);
+          if (dots >= 4) {
+            spawnAyBurst();
+          }
+        }
+
+        applyEdgePlacement(effectiveTime, wordObj, indexChanged);
+      }
+
+      function resetTransientFx() {
+        document.body.classList.remove("beat-a", "beat-b", "beat-c", "wave-on");
+        starOverlay.style.opacity = "";
+        setBallsState(false, false);
+        nextTsScatterAt = 0;
+        ayPatternTimers.forEach((id) => window.clearTimeout(id));
+        ayPatternTimers = [];
+        clearEdgePlacement();
+      }
+
+      function updateLyrics(currentTime, force = false) {
+        const effectiveTime = currentTime;
+
+        if (!lyricWords.length) {
+          applyTimelineEffects(effectiveTime, null, false, -1);
+          return;
+        }
+
+        const nextIndex = findWordIndex(effectiveTime);
+
+        const currentWord = nextIndex >= 0 ? lyricWords[nextIndex] : null;
+        const indexChanged = nextIndex !== activeWordIndex;
+
+        if (force || indexChanged) {
+          activeWordIndex = nextIndex;
+
+          if (!currentWord) {
+            lyricEl.textContent = "...";
+            lyricEl.className = "lyric";
+            currentBaseEffect = "effect-default";
+            clearEdgePlacement();
+          } else {
+            applyWordStyle(currentWord);
+          }
+        }
+
+        applyTimelineEffects(effectiveTime, currentWord, indexChanged, nextIndex);
+      }
+
+      function stopSyncLoop() {
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+      }
+
+      function syncLoop() {
+        updateLyrics(audio.currentTime);
+        rafId = requestAnimationFrame(syncLoop);
+      }
+
+      function startSyncLoop() {
+        if (rafId === null) {
+          rafId = requestAnimationFrame(syncLoop);
+        }
+      }
+
+      async function startSequenceFromBeginning() {
+        if (!lyricWords.length) {
+          return;
+        }
+
+        stopSyncLoop();
+        resetTransientFx();
+        audio.currentTime = 0;
+        activeWordIndex = -1;
+        lyricEl.textContent = "...";
+        lyricEl.className = "lyric";
+        currentBaseEffect = "effect-default";
+        setSceneEffect("effect-default");
+        updateLyrics(0, true);
+
+        try {
+          await audio.play();
+          restartVideo(skyVideo);
+          restartVideo(clockVideo);
+          restartVideo(milkyVideo);
+          startBtn.hidden = true;
+          setStatus("");
+        } catch (error) {
+          setStatus("No se pudo iniciar. Presiona de nuevo.", true);
+          console.error(error);
+        }
+      }
+
+      async function loadLyrics() {
+        try {
+          const response = await fetch(encodeURI(LRC_PATH));
+          if (!response.ok) {
+            throw new Error(`No se pudo cargar ${LRC_PATH}`);
+          }
+
+          const rawLrc = await response.text();
+          lyricWords = parseLrc(rawLrc);
+
+          if (!lyricWords.length) {
+            throw new Error("El archivo LRC no tiene timestamps validos.");
+          }
+
+          invertAStartIndex = Math.max(0, findWordIndex(RANGES.invertA[0]));
+          invertBStartIndex = Math.max(0, findWordIndex(RANGES.invertB[0]));
+
+          startBtn.disabled = false;
+          setStatus("Listo. Pulsa el boton para iniciar.");
+        } catch (error) {
+          lyricEl.textContent = "Error";
+          startBtn.disabled = true;
+          setStatus("No se pudo cargar el LRC. Usa servidor local.", true);
+          console.error(error);
+        }
+      }
+
+      startBtn.addEventListener("click", async () => {
+        await startSequenceFromBeginning();
+      });
+
+      audio.addEventListener("play", () => {
+        startSyncLoop();
+      });
+
+      audio.addEventListener("pause", () => {
+        stopSyncLoop();
+      });
+
+      audio.addEventListener("ended", () => {
+        stopSyncLoop();
+        resetTransientFx();
+        setSceneEffect("effect-default");
+        lyricEl.textContent = "";
+        lyricEl.className = "lyric";
+        setStatus("");
+      });
+
+      audio.addEventListener("timeupdate", () => {
+        updateLyrics(audio.currentTime);
+      });
+
+      initBalls();
+      loadLyrics();
+    </script>
+  </body>
+</html>

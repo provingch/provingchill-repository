@@ -1,0 +1,2239 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bleed Me Slow</title>
+    <link rel="icon" type="image/png" href="media/favicon.png">
+    <style>
+      :root {
+        --ink: #ffffff;
+        --muted: #aaaaaa;
+        --accent: #cccccc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        min-height: 100dvh;
+        margin: 0;
+      }
+
+      body {
+        position: relative;
+        min-height: 100dvh;
+        overflow: hidden;
+        background: #000;
+        color: var(--ink);
+        font-family: "Arial Black", "Impact", sans-serif;
+        overscroll-behavior: none;
+      }
+
+      #scene {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .scene-scrim {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        background:
+          radial-gradient(circle at 50% 58%, rgba(255, 146, 42, 0.08), transparent 34%),
+          linear-gradient(180deg, rgba(5, 3, 10, 0.08), rgba(7, 4, 10, 0.12) 38%, rgba(7, 5, 10, 0.34) 100%);
+      }
+
+      .intro-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+        background: #000;
+        opacity: 1;
+      }
+
+      .intro-overlay.is-fading {
+        animation: intro-fade-out 5s ease forwards;
+      }
+
+      .final-blackout {
+        position: fixed;
+        inset: 0;
+        z-index: 5;
+        pointer-events: none;
+        background: #000;
+        opacity: 0;
+      }
+
+      @keyframes intro-fade-out {
+        0% {
+          opacity: 1;
+        }
+
+        100% {
+          opacity: 0;
+        }
+      }
+
+      .stage {
+        position: relative;
+        z-index: 3;
+        width: 100%;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(0.95rem, 2vh, 1.2rem);
+        padding:
+          max(1.2rem, env(safe-area-inset-top))
+          max(1rem, env(safe-area-inset-right))
+          max(1.25rem, env(safe-area-inset-bottom))
+          max(1rem, env(safe-area-inset-left));
+        text-align: center;
+      }
+
+      .button-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.8rem;
+        width: 100%;
+        max-width: 24rem;
+      }
+
+      .start-btn {
+        font: inherit;
+        font-size: 0.95rem;
+        border: 1px solid #454545;
+        background: #111;
+        color: #fff;
+        padding: 10px 18px;
+        border-radius: 6px;
+        touch-action: manipulation;
+        cursor: pointer;
+        min-height: 46px;
+        width: min(88vw, 340px);
+      }
+
+      .start-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .lyric {
+        margin: 0;
+        min-height: 1.1em;
+        width: min(92vw, 980px);
+        max-width: min(92vw, 980px);
+        font-family: "Impact", "Arial Black", sans-serif;
+        font-size: clamp(1.35rem, 3.9vw, 2.5rem);
+        font-weight: 900;
+        line-height: 0.96;
+        letter-spacing: 0.02em;
+        color: var(--ink);
+        text-align: center;
+        text-wrap: balance;
+        word-break: normal;
+        padding-inline: 0.2rem;
+        text-shadow: 0 2px 16px rgba(0, 0, 0, 0.24);
+      }
+
+      .lyric.is-empty {
+        opacity: 0;
+      }
+
+      .button-status {
+        margin: 0;
+        min-height: 1rem;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.9rem;
+        color: var(--muted);
+        text-align: center;
+        width: min(88vw, 28rem);
+      }
+
+      audio {
+        display: none;
+      }
+
+      @media (max-width: 640px) {
+        .stage {
+          min-height: 100svh;
+          gap: 0.95rem;
+          padding:
+            calc(env(safe-area-inset-top) + 1rem)
+            calc(env(safe-area-inset-right) + 0.9rem)
+            calc(env(safe-area-inset-bottom) + 1.65rem)
+            calc(env(safe-area-inset-left) + 0.9rem);
+        }
+
+        .start-btn {
+          width: min(100%, 320px);
+          font-size: 1rem;
+        }
+
+        .lyric {
+          width: min(95vw, 34rem);
+          max-width: min(95vw, 34rem);
+          min-height: 1.35em;
+          font-size: clamp(1.15rem, 6.8vw, 1.95rem);
+          line-height: 1;
+          letter-spacing: 0.015em;
+        }
+
+        .button-status {
+          width: min(94vw, 22rem);
+          min-height: 1.15rem;
+          font-size: 0.84rem;
+        }
+      }
+
+      @media (max-width: 420px) {
+        .stage {
+          gap: 0.85rem;
+        }
+
+        .lyric {
+          font-size: clamp(1.05rem, 7.1vw, 1.75rem);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene" aria-hidden="true"></canvas>
+    <div class="scene-scrim" aria-hidden="true"></div>
+    <div id="intro-overlay" class="intro-overlay" aria-hidden="true"></div>
+    <div id="final-blackout" class="final-blackout" aria-hidden="true"></div>
+
+    <main class="stage">
+      <div class="button-container">
+        <button id="start-btn" class="start-btn" disabled>Comenzar secuencia</button>
+      </div>
+
+      <p id="lyric" class="lyric is-empty"></p>
+
+      <p id="status" class="button-status">Cargando timestamps...</p>
+    </main>
+
+    <audio id="audio" preload="auto" src="media/audio.mp3">
+      Tu navegador no soporta audio HTML5.
+    </audio>
+
+    <script>
+      const LRC_PATH = "media/lyrics.lrc";
+      const searchParams = new URLSearchParams(window.location.search);
+      const autoStart = searchParams.get("autostart") === "1";
+      const forcedSceneTimeRaw = searchParams.get("time");
+      const forcedSceneTime = forcedSceneTimeRaw === null ? null : Number(forcedSceneTimeRaw);
+      const forcedSceneProgressRaw = searchParams.get("progress");
+      const forcedSceneProgress = forcedSceneProgressRaw === null ? null : Number(forcedSceneProgressRaw);
+      const CHORUS_WINDOWS = [
+        { start: 37.75, end: 71.51 },
+        { start: 105.26, end: 139.0 }
+      ];
+      const LYRIC_BURST_MIN_STEP = 0.11;
+      const CHORUS_BEAMS = [
+        { color: [255, 104, 96], angle: -1.98, sweep: 0.2, speed: 0.00094, width: 0.031, length: 0.98, phase: 0.2 },
+        { color: [255, 206, 104], angle: -1.76, sweep: 0.17, speed: 0.0008, width: 0.028, length: 0.88, phase: 1.1 },
+        { color: [132, 246, 184], angle: -1.52, sweep: 0.19, speed: 0.0009, width: 0.032, length: 0.93, phase: 2.0 },
+        { color: [96, 208, 255], angle: -1.28, sweep: 0.18, speed: 0.00076, width: 0.034, length: 1.02, phase: 2.9 },
+        { color: [146, 162, 255], angle: -1.02, sweep: 0.2, speed: 0.00086, width: 0.03, length: 0.95, phase: 3.8 },
+        { color: [255, 96, 188], angle: -0.8, sweep: 0.16, speed: 0.00072, width: 0.027, length: 0.84, phase: 4.7 }
+      ];
+      const FINALE_FIREWORK_LAYOUTS = [
+        {
+          burstX: 0.18,
+          burstY: 0.25,
+          arc: -0.11,
+          radius: 0.15,
+          colors: [
+            [255, 112, 92],
+            [255, 208, 118],
+            [255, 246, 214]
+          ]
+        },
+        {
+          burstX: 0.34,
+          burstY: 0.17,
+          arc: -0.06,
+          radius: 0.17,
+          colors: [
+            [108, 226, 255],
+            [132, 255, 196],
+            [230, 246, 255]
+          ]
+        },
+        {
+          burstX: 0.5,
+          burstY: 0.12,
+          arc: 0,
+          radius: 0.19,
+          colors: [
+            [255, 112, 208],
+            [176, 146, 255],
+            [255, 224, 164]
+          ]
+        },
+        {
+          burstX: 0.66,
+          burstY: 0.18,
+          arc: 0.05,
+          radius: 0.18,
+          colors: [
+            [255, 154, 102],
+            [255, 236, 144],
+            [255, 249, 226]
+          ]
+        },
+        {
+          burstX: 0.8,
+          burstY: 0.25,
+          arc: 0.1,
+          radius: 0.16,
+          colors: [
+            [112, 214, 255],
+            [140, 255, 218],
+            [232, 248, 255]
+          ]
+        },
+        {
+          burstX: 0.29,
+          burstY: 0.12,
+          arc: -0.07,
+          radius: 0.17,
+          colors: [
+            [255, 112, 188],
+            [255, 176, 124],
+            [255, 235, 188]
+          ]
+        },
+        {
+          burstX: 0.56,
+          burstY: 0.23,
+          arc: 0.02,
+          radius: 0.18,
+          colors: [
+            [152, 144, 255],
+            [255, 118, 226],
+            [255, 236, 196]
+          ]
+        },
+        {
+          burstX: 0.76,
+          burstY: 0.14,
+          arc: 0.08,
+          radius: 0.18,
+          colors: [
+            [116, 255, 204],
+            [114, 212, 255],
+            [255, 245, 214]
+          ]
+        }
+      ];
+      const isMobile = window.innerWidth <= 768 || ('ontouchstart' in window && window.innerWidth <= 1024);
+      const SCENE_QUALITY = isMobile ? {
+        fps: 30,
+        starCount: 70,
+        rayCount: 6,
+        cloudCount: 3,
+        edgeStep: 8,
+        waveStep: 10,
+        foamCount: 36,
+        shimmerLines: 8,
+        cloudDetail: 1,
+        cloudDrift: 1
+      } : {
+        fps: 48,
+        starCount: 190,
+        rayCount: 12,
+        cloudCount: 6,
+        edgeStep: 4,
+        waveStep: 6,
+        foamCount: 96,
+        shimmerLines: 22,
+        cloudDetail: 3,
+        cloudDrift: 1
+      };
+
+      const audio = document.getElementById("audio");
+      const startBtn = document.getElementById("start-btn");
+      const introOverlay = document.getElementById("intro-overlay");
+      const finalBlackoutEl = document.getElementById("final-blackout");
+      const lyricEl = document.getElementById("lyric");
+      const statusText = document.getElementById("status");
+      const cv = document.getElementById("scene");
+      const cx = cv.getContext("2d", { alpha: false, desynchronized: true });
+
+      let lyricWords = [];
+      let lyricsLoaded = false;
+      let loadedLyricLineCount = 0;
+      let activeWordIndex = -1;
+      let rafId = null;
+      let autoStartConsumed = false;
+      let sequenceLockedAfterEnding = false;
+      let finalBlackoutStartTime = null;
+
+      let W = 0;
+      let H = 0;
+      let T = 0;
+      let lastSceneFrame = 0;
+      let sandCv = document.createElement("canvas");
+      let sandCtx = sandCv.getContext("2d");
+      let smokeCv = document.createElement("canvas");
+      let smokeCtx = smokeCv.getContext("2d");
+      let sandEdgeCache = null;
+      let stars = [];
+      let foams = [];
+      let smokeTextureReady = false;
+      let finaleFireworkBursts = [];
+      const fireworkBurstCache = new Map();
+
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+      const smoothstep = (edge0, edge1, value) => {
+        if (edge0 === edge1) {
+          return value < edge0 ? 0 : 1;
+        }
+
+        const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+        return t * t * (3 - 2 * t);
+      };
+
+      function mixColor(colorA, colorB, amount) {
+        return [
+          Math.round(lerp(colorA[0], colorB[0], amount)),
+          Math.round(lerp(colorA[1], colorB[1], amount)),
+          Math.round(lerp(colorA[2], colorB[2], amount))
+        ];
+      }
+
+      function rgb(color) {
+        return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+      }
+
+      function rgba(color, alpha) {
+        return `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`;
+      }
+
+      function getQuality() {
+        return SCENE_QUALITY;
+      }
+
+      function sceneFrameMs() {
+        const q = getQuality();
+        const isPlaying = !audio.paused && !audio.ended;
+        if (isMobile && !isPlaying) {
+          return 1000 / 12; // ~12fps when idle on mobile
+        }
+        return 1000 / q.fps;
+      }
+
+      function getTrackDuration() {
+        if (Number.isFinite(audio.duration) && audio.duration > 0) {
+          return audio.duration;
+        }
+
+        if (lyricWords.length) {
+          return lyricWords[lyricWords.length - 1].time + 2.8;
+        }
+
+        return 0;
+      }
+
+      function getPlaybackTime() {
+        if (Number.isFinite(forcedSceneTime)) {
+          return Math.max(0, forcedSceneTime);
+        }
+
+        if (Number.isFinite(audio.currentTime) && audio.currentTime > 0) {
+          return audio.currentTime;
+        }
+
+        if (Number.isFinite(audio.currentTime)) {
+          return Math.max(0, audio.currentTime);
+        }
+
+        if (Number.isFinite(forcedSceneProgress)) {
+          return getTrackDuration() * clamp(forcedSceneProgress, 0, 1);
+        }
+
+        return 0;
+      }
+
+      function getPlaybackProgress() {
+        if (Number.isFinite(forcedSceneProgress)) {
+          return clamp(forcedSceneProgress, 0, 1);
+        }
+
+        if (Number.isFinite(forcedSceneTime)) {
+          const duration = getTrackDuration();
+          return duration ? clamp(forcedSceneTime / duration, 0, 1) : 0;
+        }
+
+        const duration = getTrackDuration();
+        if (!duration) {
+          return 0;
+        }
+
+        return clamp(audio.currentTime / duration, 0, 1);
+      }
+
+      function getTimedWindowIntensity(time, windows, fadeIn = 2.4, fadeOut = 2.8) {
+        let peak = 0;
+
+        windows.forEach((window) => {
+          const enter = smoothstep(window.start - fadeIn, window.start + 0.6, time);
+          const exit = 1 - smoothstep(window.end - 0.8, window.end + fadeOut, time);
+          peak = Math.max(peak, clamp(enter * exit, 0, 1));
+        });
+
+        return peak;
+      }
+
+      function hash(n) {
+        const x = Math.sin(n) * 43758.5453;
+        return x - Math.floor(x);
+      }
+
+      function noise1(x) {
+        const i = Math.floor(x);
+        const f = x - i;
+        const u = f * f * (3 - 2 * f);
+        return lerp(hash(i), hash(i + 1), u);
+      }
+
+      function noise2(x, y) {
+        const ix = Math.floor(x);
+        const iy = Math.floor(y);
+        const fx = x - ix;
+        const fy = y - iy;
+        const ux = fx * fx * (3 - 2 * fx);
+        const uy = fy * fy * (3 - 2 * fy);
+        return lerp(
+          lerp(hash(ix + iy * 57), hash(ix + 1 + iy * 57), ux),
+          lerp(hash(ix + (iy + 1) * 57), hash(ix + 1 + (iy + 1) * 57), ux),
+          uy
+        );
+      }
+
+      function bez2(t, x0, y0, cpx, cpy, x1, y1) {
+        const m = 1 - t;
+        return {
+          x: m * m * x0 + 2 * m * t * cpx + t * t * x1,
+          y: m * m * y0 + 2 * m * t * cpy + t * t * y1
+        };
+      }
+
+      function buildStars() {
+        stars = Array.from({ length: getQuality().starCount }, () => ({
+          x: Math.random(),
+          y: Math.random() * 0.46,
+          r: Math.random() * 1.4 + 0.3,
+          a: Math.random() * 0.7 + 0.08,
+          tw: Math.random() * Math.PI * 2,
+          sp: Math.random() * 0.003 + 0.001
+        }));
+      }
+
+      function buildFoams() {
+        foams = Array.from({ length: getQuality().foamCount }, () => ({
+          offset: Math.random(),
+          band: lerp(-0.012, 0.034, Math.random()),
+          r: lerp(0.8, 3.6, Math.random()),
+          a: Math.random() * 0.45 + 0.08,
+          drift: lerp(0.000018, 0.00005, Math.random()),
+          pulse: Math.random() * Math.PI * 2
+        }));
+      }
+
+      function buildFireworkBurstParticles(variant) {
+        if (fireworkBurstCache.has(variant)) {
+          return fireworkBurstCache.get(variant);
+        }
+
+        const particles = [];
+        const ringConfigs = [
+          { count: 24, radius: 0.34, spread: 0.2, size: 1.35 },
+          { count: 36, radius: 0.64, spread: 0.18, size: 1.15 },
+          { count: 52, radius: 0.98, spread: 0.16, size: 0.95 }
+        ];
+
+        ringConfigs.forEach((ring, ringIndex) => {
+          for (let index = 0; index < ring.count; index += 1) {
+            const seed = variant * 97.13 + ringIndex * 43.7 + index * 11.9;
+            const angle = (index / ring.count) * Math.PI * 2 + hash(seed) * 0.3 + ringIndex * 0.11;
+            const radius = ring.radius * (0.78 + hash(seed + 1.1) * ring.spread * 2);
+            const ellipse = 0.9 + hash(seed + 2.2) * 0.18;
+            particles.push({
+              x: Math.cos(angle) * radius,
+              y: Math.sin(angle) * radius * ellipse,
+              startAngle: angle + (hash(seed + 3.3) - 0.5) * 0.36,
+              startRadius: 0.18 + hash(seed + 4.4) * 0.7,
+              driftX: (hash(seed + 5.5) - 0.5) * 0.26,
+              driftY: 0.04 + hash(seed + 6.6) * 0.28,
+              size: ring.size * (0.72 + hash(seed + 7.7) * 0.8),
+              twinkle: hash(seed + 8.8) * Math.PI * 2,
+              colorIndex: Math.floor(hash(seed + 9.9) * 3)
+            });
+          }
+        });
+
+        for (let index = 0; index < 18; index += 1) {
+          const seed = variant * 131.7 + index * 17.4;
+          const angle = hash(seed) * Math.PI * 2;
+          const radius = 0.12 + hash(seed + 1.2) * 0.24;
+          particles.push({
+            x: Math.cos(angle) * radius,
+            y: Math.sin(angle) * radius,
+            startAngle: angle,
+            startRadius: 0.16 + hash(seed + 2.4) * 0.36,
+            driftX: (hash(seed + 3.6) - 0.5) * 0.14,
+            driftY: 0.02 + hash(seed + 4.8) * 0.16,
+            size: 0.9 + hash(seed + 6.0) * 0.7,
+            twinkle: hash(seed + 7.2) * Math.PI * 2,
+            colorIndex: Math.floor(hash(seed + 8.4) * 3)
+          });
+        }
+
+        fireworkBurstCache.set(variant, particles);
+        return particles;
+      }
+
+      function buildFinaleFireworkBursts(words) {
+        const finaleIndex = words.findIndex((word, index) => {
+          if (cleanWord(word.text) !== "Bleed") {
+            return false;
+          }
+
+          return (
+            cleanWord(words[index + 1]?.text) === "Bleed me" &&
+            cleanWord(words[index + 2]?.text) === "Bleed me slow"
+          );
+        });
+
+        const fallbackTimes = [142.71, 146.43, 150.43, 154.12, 157.86, 161.59, 165.28, 169.0];
+        let sourceTimes = fallbackTimes;
+
+        if (finaleIndex >= 0) {
+          const dotRun = [];
+          for (let index = finaleIndex - 1; index >= 0; index -= 1) {
+            if (!isTripleDotLyric(words[index].text)) {
+              break;
+            }
+            dotRun.unshift(words[index].time);
+          }
+
+          if (dotRun.length) {
+            sourceTimes = dotRun;
+          }
+        }
+
+        return sourceTimes.map((time, index) => ({
+          ...FINALE_FIREWORK_LAYOUTS[index % FINALE_FIREWORK_LAYOUTS.length],
+          time,
+          particles: buildFireworkBurstParticles(index % FINALE_FIREWORK_LAYOUTS.length)
+        }));
+      }
+
+      function buildFinalBlackoutStartTime(words) {
+        const fallbackStart = 180.44;
+        let lastBleedMeSlowIndex = -1;
+
+        for (let index = 0; index < words.length; index += 1) {
+          if (cleanWord(words[index].text).toLowerCase() === "bleed me slow") {
+            lastBleedMeSlowIndex = index;
+          }
+        }
+
+        for (let index = words.length - 1; index > lastBleedMeSlowIndex; index -= 1) {
+          if (isTripleDotLyric(words[index].text)) {
+            return words[index].time;
+          }
+        }
+
+        return fallbackStart;
+      }
+
+      function getFinalBlackoutIntensity(time) {
+        if (!Number.isFinite(finalBlackoutStartTime)) {
+          return 0;
+        }
+
+        return smoothstep(finalBlackoutStartTime, finalBlackoutStartTime + 1.15, time);
+      }
+
+      function syncFinalBlackout(intensity) {
+        if (!finalBlackoutEl) {
+          return;
+        }
+
+        finalBlackoutEl.style.opacity = String(clamp(intensity * 0.96, 0, 0.96));
+      }
+
+      function buildSandTexture() {
+        const scale = isMobile ? 0.5 : 1;
+        const sw = Math.max(1, Math.round(W * scale));
+        const sh = Math.max(1, Math.round(H * 0.38 * scale));
+        sandCv.width = sw;
+        sandCv.height = sh;
+        const img = sandCtx.createImageData(sw, sh);
+
+        for (let y = 0; y < sh; y += 1) {
+          for (let x = 0; x < sw; x += 1) {
+            const n =
+              noise2(x * 0.026, y * 0.026) * 0.54 +
+              noise2(x * 0.085, y * 0.085) * 0.28 +
+              noise2(x * 0.23, y * 0.23) * 0.18;
+            const v = Math.round(n * 58);
+            const i = (y * sw + x) * 4;
+            img.data[i] = 138 + v;
+            img.data[i + 1] = 92 + v;
+            img.data[i + 2] = 42 + v;
+            img.data[i + 3] = 255;
+          }
+        }
+
+        sandCtx.putImageData(img, 0, 0);
+      }
+
+      function resizeSmokeTexture() {
+        const detail = getQuality().cloudDetail;
+        const sw = Math.max(240, Math.round(W * (detail >= 3 ? 0.34 : 0.22)));
+        const sh = Math.max(140, Math.round(H * (detail >= 3 ? 0.23 : 0.15)));
+        smokeCv.width = sw;
+        smokeCv.height = sh;
+        smokeTextureReady = false;
+      }
+
+      function buildSandEdge() {
+        const edgeStep = getQuality().edgeStep;
+        sandEdgeCache = [];
+
+        for (let x = 0; x <= W; x += edgeStep) {
+          const base = lerp(H * 0.8, H * 0.715, x / W);
+          const organic =
+            (noise1(x * 0.0055) - 0.5) * H * 0.02 +
+            (noise1(x * 0.017 + 31.7) - 0.5) * H * 0.009 +
+            (noise1(x * 0.042 + 7.3) - 0.5) * H * 0.004;
+          sandEdgeCache.push({ x, y: base + organic });
+        }
+      }
+
+      function sandYStatic(px) {
+        if (!sandEdgeCache) {
+          return H * 0.78;
+        }
+
+        const idx = clamp(px / getQuality().edgeStep, 0, sandEdgeCache.length - 2);
+        const i0 = Math.floor(idx);
+        const frac = idx - i0;
+        return sandEdgeCache[i0].y * (1 - frac) + sandEdgeCache[i0 + 1].y * frac;
+      }
+
+      function sandYAnim(px, t) {
+        const base = sandYStatic(px);
+        return (
+          base +
+          Math.sin(px * 0.009 + t * 0.00045) * H * 0.008 +
+          Math.sin(px * 0.024 + t * 0.00065 + 1.8) * H * 0.004
+        );
+      }
+
+      function getPalmBaseY(px) {
+        const wideScreenAmount = smoothstep(0.9, 1.55, W / Math.max(H, 1));
+        const footingDepth = H * lerp(0.008, 0.018, wideScreenAmount);
+        return sandYStatic(px) + footingDepth;
+      }
+
+      function resizeScene() {
+        W = cv.width = window.innerWidth;
+        H = cv.height = window.innerHeight;
+        buildFoams();
+        buildStars();
+        buildSandTexture();
+        resizeSmokeTexture();
+        buildSandEdge();
+        lastSceneFrame = 0;
+      }
+
+      window.addEventListener("resize", resizeScene);
+
+      const CLOUDS = [
+        {
+          cx: 0.13,
+          cy: 0.105,
+          width: 0.14,
+          height: 0.05,
+          alpha: 0.72,
+          phase: 0.2,
+          speed: 0.00004,
+          drift: 0.012,
+          lift: 0.003,
+          tilt: -0.05,
+          parts: [
+            { dx: -0.07, dy: 0.008, rx: 0.068, ry: 0.028, rot: -0.05 },
+            { dx: -0.01, dy: -0.012, rx: 0.09, ry: 0.035, rot: 0.02 },
+            { dx: 0.072, dy: -0.008, rx: 0.075, ry: 0.03, rot: 0.06 },
+            { dx: 0.126, dy: 0.006, rx: 0.05, ry: 0.022, rot: 0.08 }
+          ]
+        },
+        {
+          cx: 0.41,
+          cy: 0.075,
+          width: 0.18,
+          height: 0.06,
+          alpha: 0.8,
+          phase: 1.3,
+          speed: 0.00003,
+          drift: 0.016,
+          lift: 0.0035,
+          tilt: 0.04,
+          parts: [
+            { dx: -0.09, dy: 0.004, rx: 0.088, ry: 0.032, rot: -0.05 },
+            { dx: -0.014, dy: -0.018, rx: 0.115, ry: 0.04, rot: 0.03 },
+            { dx: 0.085, dy: -0.012, rx: 0.092, ry: 0.036, rot: 0.08 },
+            { dx: 0.165, dy: 0.004, rx: 0.055, ry: 0.024, rot: 0.08 }
+          ]
+        },
+        {
+          cx: 0.66,
+          cy: 0.13,
+          width: 0.13,
+          height: 0.048,
+          alpha: 0.64,
+          phase: 2.1,
+          speed: 0.000045,
+          drift: 0.011,
+          lift: 0.0025,
+          tilt: -0.02,
+          parts: [
+            { dx: -0.052, dy: 0.002, rx: 0.064, ry: 0.026, rot: -0.04 },
+            { dx: 0.014, dy: -0.013, rx: 0.08, ry: 0.03, rot: 0.01 },
+            { dx: 0.082, dy: -0.006, rx: 0.06, ry: 0.025, rot: 0.08 }
+          ]
+        },
+        {
+          cx: 0.84,
+          cy: 0.07,
+          width: 0.11,
+          height: 0.04,
+          alpha: 0.58,
+          phase: 2.8,
+          speed: 0.000035,
+          drift: 0.01,
+          lift: 0.002,
+          tilt: 0.02,
+          parts: [
+            { dx: -0.035, dy: 0.006, rx: 0.052, ry: 0.021, rot: -0.04 },
+            { dx: 0.016, dy: -0.01, rx: 0.068, ry: 0.026, rot: 0.01 },
+            { dx: 0.07, dy: 0.004, rx: 0.045, ry: 0.018, rot: 0.08 }
+          ]
+        },
+        {
+          cx: 0.53,
+          cy: 0.22,
+          width: 0.15,
+          height: 0.054,
+          alpha: 0.54,
+          phase: 4.3,
+          speed: 0.000028,
+          drift: 0.013,
+          lift: 0.003,
+          tilt: 0.05,
+          parts: [
+            { dx: -0.075, dy: 0.01, rx: 0.068, ry: 0.026, rot: -0.03 },
+            { dx: -0.002, dy: -0.014, rx: 0.092, ry: 0.034, rot: 0.02 },
+            { dx: 0.08, dy: -0.008, rx: 0.072, ry: 0.028, rot: 0.07 }
+          ]
+        },
+        {
+          cx: 0.24,
+          cy: 0.205,
+          width: 0.1,
+          height: 0.036,
+          alpha: 0.46,
+          phase: 5.1,
+          speed: 0.000034,
+          drift: 0.009,
+          lift: 0.0024,
+          tilt: -0.03,
+          parts: [
+            { dx: -0.03, dy: 0.004, rx: 0.05, ry: 0.02, rot: -0.04 },
+            { dx: 0.022, dy: -0.01, rx: 0.068, ry: 0.024, rot: 0.03 },
+            { dx: 0.078, dy: 0.003, rx: 0.04, ry: 0.017, rot: 0.08 }
+          ]
+        }
+      ];
+
+      function smokeFbm(x, y) {
+        let total = 0;
+        let amplitude = 0.58;
+        let frequency = 1.18;
+
+        for (let octave = 0; octave < 4; octave += 1) {
+          total += (noise2(x * frequency, y * frequency) - 0.5) * amplitude;
+          frequency *= 2.05;
+          amplitude *= 0.56;
+        }
+
+        return total;
+      }
+
+      function traceSmokeFieldBounds(horizonY) {
+        const bottom = horizonY * 1.01;
+        const steps = 14;
+
+        cx.beginPath();
+        cx.moveTo(0, 0);
+        cx.lineTo(W, 0);
+        cx.lineTo(W, bottom);
+
+        for (let i = steps; i >= 0; i -= 1) {
+          const mix = i / steps;
+          const x = W * mix;
+          const wave = (Math.sin(mix * Math.PI * 2.1 + 0.35) * 0.5 + 0.5) * H * 0.01;
+          const ripple = (Math.sin(mix * Math.PI * 5.2 + 1.4) * 0.5 + 0.5) * H * 0.004;
+          const organic = noise1(mix * 12.8 + 5.7) * H * 0.015;
+          const y = bottom - H * 0.013 - wave - ripple - organic;
+          cx.lineTo(x, y);
+        }
+
+        cx.closePath();
+      }
+
+      function renderSkySmokeTexture() {
+        if (!smokeCtx || !smokeCv.width || !smokeCv.height) {
+          return;
+        }
+
+        if (smokeTextureReady) {
+          return;
+        }
+
+        smokeTextureReady = true;
+        const sw = smokeCv.width;
+        const sh = smokeCv.height;
+        const image = smokeCtx.createImageData(sw, sh);
+        const data = image.data;
+
+        for (let y = 0; y < sh; y += 1) {
+          const v = y / Math.max(1, sh - 1);
+          const verticalShape = 0.54 + Math.pow(Math.sin(v * Math.PI), 0.82) * 0.34 + (1 - v) * 0.18;
+
+          for (let x = 0; x < sw; x += 1) {
+            const u = x / Math.max(1, sw - 1);
+            const warpX = (noise2(u * 1.18 + 7.4, v * 1.32 + 11.8) - 0.5) * 0.24;
+            const warpY = (noise2(u * 1.44 + 15.2, v * 1.08 + 3.6) - 0.5) * 0.16;
+            const broad = smokeFbm((u + warpX) * 2.18 + 4.2, (v + warpY) * 1.42 + 9.1);
+            const soft = smokeFbm((u - warpY * 0.3) * 4.35 + 12.4, (v + warpX * 0.18) * 2.5 + 6.3);
+            const detail = noise2((u + broad * 0.18) * 8.2 + 2.1, (v - broad * 0.08) * 4.6 + 8.7);
+            const bankA = Math.exp(-((u - 0.22) * (u - 0.22)) / 0.038 - ((v - 0.57) * (v - 0.57)) / 0.12) * 0.42;
+            const bankB = Math.exp(-((u - 0.55) * (u - 0.55)) / 0.06 - ((v - 0.42) * (v - 0.42)) / 0.11) * 0.48;
+            const bankC = Math.exp(-((u - 0.82) * (u - 0.82)) / 0.05 - ((v - 0.34) * (v - 0.34)) / 0.09) * 0.36;
+            const bankD = Math.exp(-((u - 0.07) * (u - 0.07)) / 0.03 - ((v - 0.28) * (v - 0.28)) / 0.08) * 0.22;
+            let density = (0.36 + broad * 0.92 + soft * 0.32 + (detail - 0.5) * 0.14 + bankA + bankB + bankC + bankD) * verticalShape;
+
+            const sunUx = 0.6;
+            const sunVy = 0.88;
+            const dx = u - sunUx;
+            const dy = v - sunVy;
+            const sunPocket = Math.exp(-(dx * dx) / 0.017 - (dy * dy) / 0.05);
+            density -= sunPocket * 0.09;
+            density = clamp(density, 0, 1.2);
+
+            const alpha = clamp((density - 0.17) * 1.18, 0, 0.88) * (0.72 + verticalShape * 0.18);
+            const warmth = clamp(0.16 + v * 0.46 + density * 0.12, 0, 1);
+            const coolLift = clamp(0.26 + (1 - v) * 0.46, 0, 1);
+            const shade = 0.56 + density * 0.4;
+            const grain = (hash(x * 17.13 + y * 91.7 + 4.3) - 0.5) * 6;
+            const baseR = lerp(44, 184, warmth);
+            const baseG = lerp(24, 118, warmth);
+            const baseB = lerp(42, 102, warmth * 0.62 + coolLift * 0.38);
+            const r = clamp(baseR * shade + grain, 0, 255);
+            const g = clamp(baseG * (shade * 0.92) + grain * 0.48, 0, 255);
+            const b = clamp(baseB * (shade * 0.98) + grain * 0.22, 0, 255);
+            const i = (y * sw + x) * 4;
+
+            data[i] = r;
+            data[i + 1] = g;
+            data[i + 2] = b;
+            data[i + 3] = alpha * 255;
+          }
+        }
+
+        smokeCtx.putImageData(image, 0, 0);
+      }
+
+      function drawSkySmoke(horizonY, nightProgress, deepNightProgress) {
+        renderSkySmokeTexture();
+        const smokeTop = -H * 0.03;
+        const smokeBottom = horizonY * 1.01;
+        const cloudDarkening = lerp(1, 0.76, nightProgress);
+        const undersideGlow = 1 - nightProgress * 0.7;
+
+        cx.save();
+        traceSmokeFieldBounds(horizonY);
+        cx.clip();
+        cx.globalAlpha = cloudDarkening;
+        cx.drawImage(smokeCv, -W * 0.02, smokeTop, W * 1.04, smokeBottom - smokeTop);
+        cx.globalAlpha = lerp(0.16, 0.08, nightProgress);
+        cx.drawImage(smokeCv, W * 0.008, smokeTop - H * 0.008, W * 1.01, smokeBottom - smokeTop + H * 0.014);
+
+        cx.globalCompositeOperation = "screen";
+        const underside = cx.createLinearGradient(0, horizonY * 0.16, 0, smokeBottom);
+        underside.addColorStop(0, "rgba(0, 0, 0, 0)");
+        underside.addColorStop(0.58, `rgba(180, 86, 42, ${0.08 * undersideGlow})`);
+        underside.addColorStop(0.86, `rgba(255, 178, 92, ${0.12 * undersideGlow})`);
+        underside.addColorStop(1, `rgba(255, 198, 126, ${0.08 * undersideGlow})`);
+        cx.fillStyle = underside;
+        cx.fillRect(0, 0, W, smokeBottom);
+
+        cx.globalCompositeOperation = "multiply";
+        const coolCeiling = cx.createLinearGradient(0, 0, 0, smokeBottom);
+        coolCeiling.addColorStop(0, `rgba(8, 10, 24, ${0.04 + nightProgress * 0.18})`);
+        coolCeiling.addColorStop(0.52, `rgba(14, 14, 28, ${0.02 + deepNightProgress * 0.08})`);
+        coolCeiling.addColorStop(1, "rgba(0, 0, 0, 0)");
+        cx.fillStyle = coolCeiling;
+        cx.fillRect(0, 0, W, smokeBottom);
+
+        const topShadow = cx.createLinearGradient(0, 0, 0, smokeBottom);
+        topShadow.addColorStop(0, `rgba(18, 5, 12, ${0.2 + nightProgress * 0.12})`);
+        topShadow.addColorStop(0.28, `rgba(24, 8, 14, ${0.1 + nightProgress * 0.06})`);
+        topShadow.addColorStop(1, "rgba(0, 0, 0, 0)");
+        cx.fillStyle = topShadow;
+        cx.fillRect(0, 0, W, smokeBottom);
+        cx.restore();
+      }
+
+      function drawCloud(cloud, t) {
+        const quality = getQuality();
+        const driftX = Math.sin(t * cloud.speed + cloud.phase) * W * cloud.drift * quality.cloudDrift;
+        const driftY = Math.cos(t * cloud.speed * 0.55 + cloud.phase) * H * cloud.lift * quality.cloudDrift;
+        const anchorX = cloud.cx * W + driftX;
+        const anchorY = cloud.cy * H + driftY;
+
+        cloud.parts.forEach((part) => {
+          const px = anchorX + part.dx * W;
+          const py = anchorY + part.dy * H;
+          const rx = part.rx * W;
+          const ry = part.ry * H;
+          const body = cx.createRadialGradient(px, py - ry * 0.18, 0, px, py, rx * 1.12);
+          body.addColorStop(0, `rgba(81, 27, 22, ${cloud.alpha * 0.34})`);
+          body.addColorStop(0.55, `rgba(46, 12, 11, ${cloud.alpha * 0.52})`);
+          body.addColorStop(0.84, `rgba(18, 6, 7, ${cloud.alpha * 0.16})`);
+          body.addColorStop(1, "rgba(0, 0, 0, 0)");
+          cx.beginPath();
+          cx.ellipse(px, py, rx, ry, part.rot, 0, Math.PI * 2);
+          cx.fillStyle = body;
+          cx.fill();
+        });
+
+        if (quality.cloudDetail >= 2) {
+          cloud.parts.forEach((part) => {
+            const px = anchorX + part.dx * W;
+            const py = anchorY + part.dy * H;
+            const rx = part.rx * W;
+            const ry = part.ry * H;
+            const core = cx.createRadialGradient(px - rx * 0.14, py - ry * 0.2, 0, px, py, rx * 0.92);
+            core.addColorStop(0, `rgba(110, 52, 34, ${cloud.alpha * 0.13})`);
+            core.addColorStop(0.42, `rgba(86, 28, 20, ${cloud.alpha * 0.2})`);
+            core.addColorStop(0.78, `rgba(34, 12, 12, ${cloud.alpha * 0.08})`);
+            core.addColorStop(1, "rgba(0, 0, 0, 0)");
+            cx.beginPath();
+            cx.ellipse(px, py, rx * 0.82, ry * 0.78, part.rot, 0, Math.PI * 2);
+            cx.fillStyle = core;
+            cx.fill();
+          });
+
+          cloud.parts.forEach((part) => {
+            const px = anchorX + part.dx * W;
+            const py = anchorY + part.dy * H;
+            const rx = part.rx * W;
+            const ry = part.ry * H;
+            const warm = cx.createRadialGradient(px, py + ry * 0.4, 0, px, py + ry * 0.18, rx * 0.88);
+            warm.addColorStop(0, `rgba(255, 201, 116, ${cloud.alpha * 0.18})`);
+            warm.addColorStop(0.32, `rgba(255, 144, 60, ${cloud.alpha * 0.28})`);
+            warm.addColorStop(0.74, `rgba(186, 67, 28, ${cloud.alpha * 0.12})`);
+            warm.addColorStop(1, "rgba(0, 0, 0, 0)");
+            cx.beginPath();
+            cx.ellipse(px, py + ry * 0.12, rx * 0.92, ry * 0.64, part.rot, 0, Math.PI * 2);
+            cx.fillStyle = warm;
+            cx.fill();
+          });
+        }
+      }
+
+      function drawPalm(baseX, baseY, scale, flip, t) {
+        const windPhase = t * 0.00082 + baseX * 0.0056 + scale * 2.4;
+        const windSwing =
+          Math.sin(windPhase) * scale * 12 +
+          Math.sin(t * 0.00146 + baseX * 0.0034 + scale) * scale * 4.4;
+        const localWindOffset = flip ? -windSwing : windSwing;
+
+        cx.save();
+        cx.translate(baseX, baseY);
+        if (flip) {
+          cx.scale(-1, 1);
+        }
+
+        const trunkHeight = scale * 215;
+        const lean = scale * 13 + localWindOffset * 0.42;
+        const crownX = lean * 0.6 + localWindOffset * 0.5;
+        const crownY = -trunkHeight;
+
+        cx.beginPath();
+        cx.moveTo(-scale * 7, 0);
+        cx.quadraticCurveTo(-scale * 3.5 + lean * 0.45, -trunkHeight * 0.54, crownX - scale * 3.2, crownY);
+        cx.lineTo(crownX + scale * 3.2, crownY);
+        cx.quadraticCurveTo(scale * 3.5 + lean * 0.45, -trunkHeight * 0.54, scale * 7, 0);
+        cx.closePath();
+        cx.fillStyle = "rgba(5, 3, 1, 0.97)";
+        cx.fill();
+
+        const fronds = [
+          { cpx: scale * 52, cpy: scale * 18, ex: scale * 124, ey: scale * 58 },
+          { cpx: -scale * 48, cpy: scale * 15, ex: -scale * 118, ey: scale * 52 },
+          { cpx: scale * 44, cpy: -scale * 22, ex: scale * 107, ey: scale * 12 },
+          { cpx: -scale * 40, cpy: -scale * 20, ex: -scale * 101, ey: scale * 10 },
+          { cpx: scale * 28, cpy: -scale * 52, ex: scale * 71, ey: -scale * 28 },
+          { cpx: -scale * 26, cpy: -scale * 50, ex: -scale * 67, ey: -scale * 25 },
+          { cpx: scale * 12, cpy: -scale * 72, ex: scale * 26, ey: -scale * 57 },
+          { cpx: -scale * 11, cpy: -scale * 70, ex: -scale * 22, ey: -scale * 54 },
+          { cpx: scale * 2, cpy: -scale * 78, ex: scale * 4, ey: -scale * 64 }
+        ];
+
+        fronds.forEach((frond, frondIndex) => {
+          const segments = 24;
+          const frondWind = localWindOffset * (0.36 + (frondIndex / fronds.length) * 0.42);
+          const frondLift = Math.sin(windPhase + frondIndex * 0.8) * scale * 3.6;
+          const controlX = crownX + frond.cpx + frondWind * 0.48;
+          const controlY = crownY + frond.cpy + frondLift * 0.45;
+          const endX = crownX + frond.ex + frondWind;
+          const endY = crownY + frond.ey + frondLift;
+          cx.lineCap = "round";
+
+          for (let i = 3; i < segments; i += 1) {
+            const t0 = i / segments;
+            const t1 = Math.min((i + 1) / segments, 1);
+            const p0 = bez2(t0, crownX, crownY, controlX, controlY, endX, endY);
+            const p1 = bez2(t1, crownX, crownY, controlX, controlY, endX, endY);
+            const dx = p1.x - p0.x;
+            const dy = p1.y - p0.y;
+            const mag = Math.sqrt(dx * dx + dy * dy) || 0.001;
+            const nx = -dy / mag;
+            const ny = dx / mag;
+            const leafLength = scale * 20 * (1 - t0 * 0.55);
+            const forward = scale * 7 * (1 - t0 * 0.4);
+
+            cx.lineWidth = scale * 1.3 * (1 - t0 * 0.4);
+            cx.strokeStyle = "rgba(4, 5, 2, 0.88)";
+
+            cx.beginPath();
+            cx.moveTo(p0.x, p0.y);
+            cx.lineTo(p0.x + nx * leafLength + (dx / mag) * forward, p0.y + ny * leafLength + (dy / mag) * forward);
+            cx.stroke();
+
+            cx.beginPath();
+            cx.moveTo(p0.x, p0.y);
+            cx.lineTo(p0.x - nx * leafLength + (dx / mag) * forward, p0.y - ny * leafLength + (dy / mag) * forward);
+            cx.stroke();
+          }
+
+          cx.beginPath();
+          cx.moveTo(crownX, crownY);
+          cx.quadraticCurveTo(controlX, controlY, endX, endY);
+          cx.strokeStyle = "rgba(3, 4, 1, 0.98)";
+          cx.lineWidth = scale * 2.1;
+          cx.stroke();
+        });
+
+        cx.restore();
+      }
+
+      function drawHeadland(horizonY) {
+        cx.save();
+        cx.beginPath();
+        cx.moveTo(0, H);
+        cx.lineTo(0, horizonY + H * 0.044);
+        cx.bezierCurveTo(W * 0.04, horizonY - H * 0.018, W * 0.13, horizonY - H * 0.062, W * 0.23, horizonY - H * 0.028);
+        cx.bezierCurveTo(W * 0.31, horizonY, W * 0.37, horizonY + H * 0.012, W * 0.42, horizonY);
+        cx.lineTo(W * 0.42, H);
+        cx.closePath();
+
+        const gradient = cx.createLinearGradient(0, horizonY - H * 0.06, 0, horizonY + H * 0.04);
+        gradient.addColorStop(0, "rgba(16, 10, 20, 0.98)");
+        gradient.addColorStop(1, "rgba(7, 4, 11, 0.99)");
+        cx.fillStyle = gradient;
+        cx.fill();
+
+        for (let i = 0; i < 10; i += 1) {
+          const tx = W * (0.024 + i * 0.041);
+          const ty = horizonY - H * (0.007 + noise1(i * 3.1 + 0.5) * 0.04);
+          const th = H * (0.017 + noise1(i * 2.7) * 0.016);
+          cx.beginPath();
+          cx.moveTo(tx, ty);
+          cx.lineTo(tx - th * 0.4, ty + th);
+          cx.lineTo(tx + th * 0.4, ty + th);
+          cx.closePath();
+          cx.fillStyle = "rgba(5, 3, 9, 0.99)";
+          cx.fill();
+        }
+
+        cx.restore();
+      }
+
+      function getHeadlandLightOrigin(horizonY) {
+        return {
+          x: W * 0.148,
+          y: horizonY - H * 0.04
+        };
+      }
+
+      function drawChorusHeadlandLights(horizonY, intensity, t) {
+        if (intensity <= 0.001) {
+          return;
+        }
+
+        const origin = getHeadlandLightOrigin(horizonY);
+
+        cx.save();
+        cx.globalCompositeOperation = "screen";
+
+        const skyAura = cx.createRadialGradient(origin.x, origin.y - H * 0.012, 0, origin.x, origin.y - H * 0.012, H * 0.16);
+        skyAura.addColorStop(0, `rgba(255, 214, 156, ${0.14 * intensity})`);
+        skyAura.addColorStop(0.3, `rgba(255, 138, 88, ${0.08 * intensity})`);
+        skyAura.addColorStop(1, "rgba(0, 0, 0, 0)");
+        cx.beginPath();
+        cx.arc(origin.x, origin.y - H * 0.012, H * 0.16, 0, Math.PI * 2);
+        cx.fillStyle = skyAura;
+        cx.fill();
+
+        CHORUS_BEAMS.forEach((beam, index) => {
+          const sweep = Math.sin(t * beam.speed + beam.phase) * beam.sweep;
+          const sway = (noise1(index * 9.4 + t * beam.speed * 1.6) - 0.5) * beam.sweep * 0.62;
+          const angle = beam.angle + sweep + sway;
+          const beamLength = H * beam.length * (0.92 + noise1(index * 11.7 + t * 0.00042) * 0.18);
+          const beamWidth = W * beam.width * (0.86 + noise1(index * 7.3 + t * 0.00064) * 0.26);
+          const alpha = intensity * (0.58 + noise1(index * 5.2 + t * 0.0012) * 0.52);
+          const tipX = origin.x + Math.cos(angle) * beamLength;
+          const tipY = origin.y + Math.sin(angle) * beamLength;
+          const perpX = -Math.sin(angle);
+          const perpY = Math.cos(angle);
+          const baseHalf = Math.max(W * 0.003, beamWidth * 0.08);
+          const outerHalf = beamWidth;
+
+          const outerGradient = cx.createLinearGradient(origin.x, origin.y, tipX, tipY);
+          outerGradient.addColorStop(0, rgba(beam.color, 0.24 * alpha));
+          outerGradient.addColorStop(0.18, rgba(beam.color, 0.17 * alpha));
+          outerGradient.addColorStop(0.58, rgba(beam.color, 0.1 * alpha));
+          outerGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+          cx.beginPath();
+          cx.moveTo(origin.x - perpX * baseHalf, origin.y - perpY * baseHalf);
+          cx.lineTo(origin.x + perpX * baseHalf, origin.y + perpY * baseHalf);
+          cx.lineTo(tipX + perpX * outerHalf, tipY + perpY * outerHalf);
+          cx.lineTo(tipX - perpX * outerHalf, tipY - perpY * outerHalf);
+          cx.closePath();
+          cx.fillStyle = outerGradient;
+          cx.fill();
+
+          const innerHalf = outerHalf * 0.34;
+          const coreGradient = cx.createLinearGradient(origin.x, origin.y, tipX, tipY);
+          coreGradient.addColorStop(0, `rgba(255, 248, 228, ${0.3 * alpha})`);
+          coreGradient.addColorStop(0.24, rgba(beam.color, 0.2 * alpha));
+          coreGradient.addColorStop(0.68, rgba(beam.color, 0.08 * alpha));
+          coreGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+          cx.beginPath();
+          cx.moveTo(origin.x - perpX * baseHalf * 0.42, origin.y - perpY * baseHalf * 0.42);
+          cx.lineTo(origin.x + perpX * baseHalf * 0.42, origin.y + perpY * baseHalf * 0.42);
+          cx.lineTo(tipX + perpX * innerHalf, tipY + perpY * innerHalf);
+          cx.lineTo(tipX - perpX * innerHalf, tipY - perpY * innerHalf);
+          cx.closePath();
+          cx.fillStyle = coreGradient;
+          cx.fill();
+
+          const sparkGradient = cx.createLinearGradient(origin.x, origin.y, tipX, tipY);
+          sparkGradient.addColorStop(0, `rgba(255, 255, 255, ${0.22 * alpha})`);
+          sparkGradient.addColorStop(0.16, `rgba(255, 255, 255, ${0.1 * alpha})`);
+          sparkGradient.addColorStop(0.42, "rgba(255, 255, 255, 0)");
+          cx.strokeStyle = sparkGradient;
+          cx.lineWidth = Math.max(1.15, beamWidth * 0.075);
+          cx.lineCap = "round";
+          cx.beginPath();
+          cx.moveTo(origin.x, origin.y);
+          cx.lineTo(origin.x + Math.cos(angle) * beamLength * 0.36, origin.y + Math.sin(angle) * beamLength * 0.36);
+          cx.stroke();
+        });
+
+        cx.restore();
+      }
+
+      function drawFinaleFireworks(sceneTime, horizonY, t) {
+        if (!finaleFireworkBursts.length) {
+          return;
+        }
+
+        const launchOrigin = getHeadlandLightOrigin(horizonY);
+        const launchLead = 0.9;
+        const burstDuration = 4.8;
+
+        cx.save();
+        cx.globalCompositeOperation = "screen";
+
+        finaleFireworkBursts.forEach((burst, burstIndex) => {
+          const phase = sceneTime - burst.time;
+          if (phase < -launchLead || phase > burstDuration) {
+            return;
+          }
+
+          const burstX = W * burst.burstX;
+          const burstY = H * burst.burstY;
+          const controlX = lerp(launchOrigin.x, burstX, 0.42) + W * burst.arc;
+          const controlY = Math.min(launchOrigin.y, burstY) - H * 0.19;
+
+          if (phase < 0) {
+            const launchProgress = smoothstep(-launchLead, 0, phase);
+            const rocketPos = bez2(launchProgress, launchOrigin.x, launchOrigin.y, controlX, controlY, burstX, burstY);
+            const trailPos = bez2(
+              Math.max(0, launchProgress - 0.12),
+              launchOrigin.x,
+              launchOrigin.y,
+              controlX,
+              controlY,
+              burstX,
+              burstY
+            );
+            cx.strokeStyle = `rgba(255, 236, 196, ${0.5 + launchProgress * 0.26})`;
+            cx.lineWidth = Math.max(1.2, H * 0.0028);
+            cx.lineCap = "round";
+            cx.beginPath();
+            cx.moveTo(trailPos.x, trailPos.y);
+            cx.lineTo(rocketPos.x, rocketPos.y);
+            cx.stroke();
+
+            cx.beginPath();
+            cx.arc(rocketPos.x, rocketPos.y, Math.max(1.4, H * 0.0028), 0, Math.PI * 2);
+            cx.fillStyle = "rgba(255, 248, 226, 0.92)";
+            cx.fill();
+            return;
+          }
+
+          const burstProgress = clamp(phase / burstDuration, 0, 1);
+          const bloom = Math.pow(1 - burstProgress, 1.22);
+          const flash = 1 - smoothstep(0, 0.16, phase);
+          const driftProgress = smoothstep(0.7, burstDuration, phase);
+          const launchResidue = 1 - smoothstep(0, 0.24, phase);
+          const fadeOut = 1 - smoothstep(1.5, burstDuration, phase);
+          const burstScaleX = H * burst.radius * (1.06 + flash * 0.05);
+          const burstScaleY = H * burst.radius * (1.02 + flash * 0.05);
+          const auraRadius = H * (burst.radius * 2 + burstProgress * 0.08);
+          const washAlpha = bloom * 0.1;
+          const particles = burst.particles || [];
+
+          const skyWash = cx.createLinearGradient(0, 0, 0, horizonY * 1.08);
+          skyWash.addColorStop(0, rgba(burst.colors[0], washAlpha * 0.55));
+          skyWash.addColorStop(0.36, rgba(burst.colors[1], washAlpha * 0.38));
+          skyWash.addColorStop(1, "rgba(0, 0, 0, 0)");
+          cx.fillStyle = skyWash;
+          cx.fillRect(0, 0, W, horizonY * 1.08);
+
+          const aura = cx.createRadialGradient(burstX, burstY, 0, burstX, burstY, auraRadius);
+          aura.addColorStop(0, rgba(burst.colors[2], flash * 0.3 + bloom * 0.1));
+          aura.addColorStop(0.2, rgba(burst.colors[0], bloom * 0.22));
+          aura.addColorStop(0.48, rgba(burst.colors[1], bloom * 0.12));
+          aura.addColorStop(1, "rgba(0, 0, 0, 0)");
+          cx.beginPath();
+          cx.arc(burstX, burstY, auraRadius, 0, Math.PI * 2);
+          cx.fillStyle = aura;
+          cx.fill();
+
+          const burstGlow = cx.createRadialGradient(burstX, burstY, 0, burstX, burstY, H * burst.radius * 1.3);
+          burstGlow.addColorStop(0, `rgba(255, 255, 255, ${0.1 * flash + 0.06 * fadeOut})`);
+          burstGlow.addColorStop(0.34, rgba(burst.colors[1], 0.12 * fadeOut));
+          burstGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
+          cx.beginPath();
+          cx.arc(burstX, burstY, H * burst.radius * 1.3, 0, Math.PI * 2);
+          cx.fillStyle = burstGlow;
+          cx.fill();
+
+          particles.forEach((particle) => {
+            const color = burst.colors[particle.colorIndex % burst.colors.length];
+            const targetX = burstX + particle.x * burstScaleX;
+            const targetY = burstY + particle.y * burstScaleY;
+            const driftX = particle.driftX * H * 0.14 * driftProgress;
+            const driftY = particle.driftY * H * 0.1 * driftProgress + driftProgress * driftProgress * H * 0.026;
+            const currentX = targetX + driftX;
+            const currentY = targetY + driftY;
+            const launchX = Math.cos(particle.startAngle) * H * burst.radius * (0.06 + particle.startRadius * 0.03) * launchResidue;
+            const launchY = Math.sin(particle.startAngle) * H * burst.radius * (0.06 + particle.startRadius * 0.03) * launchResidue;
+            const trailX = currentX - launchX * 0.78 - particle.driftX * H * 0.026 * driftProgress;
+            const trailY = currentY - launchY * 0.78 - (particle.driftY * H * 0.018 * driftProgress + driftProgress * H * 0.012);
+            const twinkle = 0.84 + Math.sin(t * 0.006 + particle.twinkle + burstIndex) * 0.16;
+            const alpha = fadeOut * (0.42 + flash * 0.2) * twinkle;
+            const trailAlpha = fadeOut * (0.22 + flash * 0.12 + launchResidue * 0.18) * twinkle;
+            const sparkRadius = Math.max(0.9, particle.size * (1 + bloom * 0.75 + flash * 0.18));
+            cx.strokeStyle = rgba(color, trailAlpha);
+            cx.lineWidth = Math.max(0.9, particle.size * 0.78);
+            cx.lineCap = "round";
+            cx.beginPath();
+            cx.moveTo(trailX, trailY);
+            cx.lineTo(currentX, currentY);
+            cx.stroke();
+
+            const sparkGlow = cx.createRadialGradient(currentX, currentY, 0, currentX, currentY, sparkRadius * 3.4);
+            sparkGlow.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.7})`);
+            sparkGlow.addColorStop(0.18, rgba(color, alpha * 0.8));
+            sparkGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
+            cx.beginPath();
+            cx.arc(currentX, currentY, sparkRadius * 3.4, 0, Math.PI * 2);
+            cx.fillStyle = sparkGlow;
+            cx.fill();
+
+            cx.beginPath();
+            cx.arc(currentX, currentY, sparkRadius, 0, Math.PI * 2);
+            cx.fillStyle = rgba(color, alpha * 0.95);
+            cx.fill();
+          });
+
+          const core = cx.createRadialGradient(burstX, burstY, 0, burstX, burstY, H * 0.03);
+          core.addColorStop(0, `rgba(255, 255, 255, ${0.44 * flash + 0.16 * bloom})`);
+          core.addColorStop(0.36, rgba(burst.colors[2], 0.24 * bloom));
+          core.addColorStop(1, "rgba(0, 0, 0, 0)");
+          cx.beginPath();
+          cx.arc(burstX, burstY, H * 0.03, 0, Math.PI * 2);
+          cx.fillStyle = core;
+          cx.fill();
+        });
+
+        cx.restore();
+      }
+
+      function drawHeadlandLightSource(horizonY, intensity, t) {
+        if (intensity <= 0.001) {
+          return;
+        }
+
+        const origin = getHeadlandLightOrigin(horizonY);
+        const alpha = intensity * (0.76 + Math.sin(t * 0.0044) * 0.08 + noise1(t * 0.0062) * 0.16);
+
+        cx.save();
+        cx.globalCompositeOperation = "screen";
+
+        const halo = cx.createRadialGradient(origin.x, origin.y - H * 0.003, 0, origin.x, origin.y - H * 0.003, H * 0.04);
+        halo.addColorStop(0, `rgba(255, 246, 226, ${0.34 * alpha})`);
+        halo.addColorStop(0.42, `rgba(255, 164, 108, ${0.17 * alpha})`);
+        halo.addColorStop(1, "rgba(0, 0, 0, 0)");
+        cx.beginPath();
+        cx.arc(origin.x, origin.y - H * 0.003, H * 0.04, 0, Math.PI * 2);
+        cx.fillStyle = halo;
+        cx.fill();
+
+        cx.beginPath();
+        cx.arc(origin.x, origin.y, Math.max(1.4, H * 0.0032), 0, Math.PI * 2);
+        cx.fillStyle = `rgba(255, 244, 218, ${0.88 * alpha})`;
+        cx.fill();
+
+        cx.restore();
+      }
+
+      function drawGodRays(sunX, sunY, t, intensity = 1) {
+        if (intensity <= 0.01) {
+          return;
+        }
+
+        cx.save();
+        cx.globalCompositeOperation = "screen";
+        const fade = Math.pow(intensity, 1.45);
+
+        const rayCount = getQuality().rayCount;
+        for (let i = 0; i < rayCount; i += 1) {
+          const angle = (i / rayCount) * Math.PI + Math.sin(t * 0.0003 + i) * 0.07;
+          const len = H * lerp(0.8, 1.45, hash(i * 7.3)) * lerp(0.42, 1, fade);
+          const width = lerp(0.01, 0.038, hash(i * 3.7 + t * 0.00008)) * lerp(0.4, 1, fade);
+          const alpha = lerp(0.018, 0.05, hash(i * 5.1)) * (0.8 + Math.sin(t * 0.0004 + i * 1.3) * 0.2) * fade;
+          const ex = sunX + Math.cos(angle) * len;
+          const ey = sunY + Math.sin(angle) * len;
+          const rayGradient = cx.createLinearGradient(sunX, sunY, ex, ey);
+          rayGradient.addColorStop(0, `rgba(255, 178, 58, ${alpha})`);
+          rayGradient.addColorStop(0.3, `rgba(255, 118, 28, ${alpha * 0.6})`);
+          rayGradient.addColorStop(0.7, `rgba(198, 58, 8, ${alpha * 0.2})`);
+          rayGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+          const perp = angle + Math.PI / 2;
+          const halfWidth = width * H;
+
+          cx.beginPath();
+          cx.moveTo(sunX, sunY);
+          cx.lineTo(sunX + Math.cos(perp) * halfWidth, sunY + Math.sin(perp) * halfWidth);
+          cx.lineTo(ex + Math.cos(perp) * halfWidth * 6, ey + Math.sin(perp) * halfWidth * 6);
+          cx.lineTo(ex - Math.cos(perp) * halfWidth * 6, ey - Math.sin(perp) * halfWidth * 6);
+          cx.lineTo(sunX - Math.cos(perp) * halfWidth, sunY - Math.sin(perp) * halfWidth);
+          cx.closePath();
+          cx.fillStyle = rayGradient;
+          cx.fill();
+        }
+
+        cx.restore();
+      }
+
+      const WAVES = [
+        {
+          yOffset: 0,
+          amp: 0.010,
+          freq: 1.16,
+          phase: 0.2,
+          speed: 0.00048,
+          top: "rgba(164, 74, 30, 0.44)",
+          mid: "rgba(86, 34, 20, 0.3)",
+          bottom: "rgba(14, 10, 20, 0)",
+          crest: 0.11,
+          depth: 0.088
+        },
+        {
+          yOffset: 0.022,
+          amp: 0.012,
+          freq: 1.45,
+          phase: 1.9,
+          speed: 0.00064,
+          top: "rgba(104, 84, 88, 0.34)",
+          mid: "rgba(42, 38, 58, 0.22)",
+          bottom: "rgba(12, 10, 18, 0)",
+          crest: 0.075,
+          depth: 0.082
+        },
+        {
+          yOffset: 0.049,
+          amp: 0.014,
+          freq: 1.8,
+          phase: 3.5,
+          speed: 0.00082,
+          top: "rgba(72, 92, 116, 0.2)",
+          mid: "rgba(28, 40, 58, 0.13)",
+          bottom: "rgba(8, 10, 16, 0)",
+          crest: 0.048,
+          depth: 0.078
+        },
+        {
+          yOffset: 0.077,
+          amp: 0.011,
+          freq: 2.24,
+          phase: 5.1,
+          speed: 0.001,
+          top: "rgba(78, 112, 132, 0.12)",
+          mid: "rgba(18, 28, 42, 0.09)",
+          bottom: "rgba(0, 0, 0, 0)",
+          crest: 0.024,
+          depth: 0.082
+        }
+      ];
+
+      function diagY(xn) {
+        return lerp(H * 0.772, H * 0.615, xn);
+      }
+
+      function waveDisplacement(wave, x, t) {
+        const xn = x / W;
+        const primary = Math.sin(xn * Math.PI * 2 * wave.freq + t * wave.speed + wave.phase);
+        const harmonic = Math.sin(xn * Math.PI * 2 * (wave.freq * 1.9) - t * wave.speed * 0.72 + wave.phase * 1.7);
+        const swell = Math.sin(xn * Math.PI * 2 * (wave.freq * 0.42) + t * wave.speed * 0.35 + wave.phase * 0.24);
+        return (primary * 0.72 + harmonic * 0.32 + swell * 0.58) * wave.amp * H;
+      }
+
+      function buildWavePoints(wave, t) {
+        const step = getQuality().waveStep;
+        const points = [];
+
+        for (let x = 0; x <= W; x += step) {
+          points.push({
+            x,
+            y: diagY(x / W) + wave.yOffset * H + waveDisplacement(wave, x, t)
+          });
+        }
+
+        if (points[points.length - 1].x !== W) {
+          points.push({
+            x: W,
+            y: diagY(1) + wave.yOffset * H + waveDisplacement(wave, W, t)
+          });
+        }
+
+        return points;
+      }
+
+      function tracePoints(points) {
+        cx.beginPath();
+        cx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i += 1) {
+          cx.lineTo(points[i].x, points[i].y);
+        }
+      }
+
+      function traceSeaFlowLine(yBase, amplitude, frequency, speed, phase, skew, t) {
+        const step = Math.max(10, getQuality().waveStep * 2);
+
+        cx.beginPath();
+        for (let x = -step; x <= W + step; x += step) {
+          const xn = x / W;
+          const waveA = Math.sin(xn * Math.PI * 2 * frequency + t * speed + phase);
+          const waveB = Math.sin(xn * Math.PI * 2 * (frequency * 1.82) - t * speed * 0.62 + phase * 1.4);
+          const y = yBase + amplitude * (waveA * 0.72 + waveB * 0.28) + xn * H * skew;
+
+          if (x === -step) {
+            cx.moveTo(x, y);
+          } else {
+            cx.lineTo(x, y);
+          }
+        }
+      }
+
+      function drawWaveBand(wave, index, t) {
+        const points = buildWavePoints(wave, t);
+        const topY = Math.min(...points.map((point) => point.y));
+        const bottomY = Math.max(...points.map((point) => point.y)) + H * wave.depth;
+
+        tracePoints(points);
+        cx.lineTo(W, bottomY);
+        cx.lineTo(0, bottomY);
+        cx.closePath();
+
+        const gradient = cx.createLinearGradient(0, topY - H * 0.01, 0, bottomY);
+        gradient.addColorStop(0, wave.top);
+        gradient.addColorStop(0.28, wave.mid);
+        gradient.addColorStop(1, wave.bottom);
+        cx.fillStyle = gradient;
+        cx.fill();
+
+        if (wave.crest > 0) {
+          tracePoints(points);
+          cx.lineWidth = Math.max(0.9, 1.3 - index * 0.14);
+          cx.strokeStyle = `rgba(255, 244, 226, ${wave.crest})`;
+          cx.stroke();
+        }
+
+        return points;
+      }
+
+      function drawWaveFoamSegments(points, opacity, t, seed) {
+        cx.save();
+        cx.lineCap = "round";
+
+        for (let i = 0; i < points.length - 1; i += 1) {
+          const chance = noise1(i * 0.31 + seed * 11.7 + t * 0.00009);
+          if (chance < 0.56) {
+            continue;
+          }
+
+          const p0 = points[i];
+          const p1 = points[i + 1];
+          const alpha = opacity * (chance - 0.5) * 1.7;
+          cx.beginPath();
+          cx.moveTo(p0.x, p0.y - H * 0.0015);
+          cx.lineTo(p1.x, p1.y - H * 0.0015);
+          cx.strokeStyle = `rgba(255, 246, 232, ${alpha})`;
+          cx.lineWidth = 0.85 + chance * 0.95;
+          cx.stroke();
+        }
+
+        cx.restore();
+      }
+
+      function drawSeaSurfaceTexture(seaTop, seaBottom, t, nightProgress, sunGlowFade) {
+        const bandCount = 10;
+
+        cx.save();
+        cx.beginPath();
+        cx.rect(0, seaTop, W, seaBottom - seaTop);
+        cx.clip();
+
+        cx.globalCompositeOperation = "screen";
+        for (let i = 0; i < bandCount; i += 1) {
+          const ratio = i / (bandCount - 1);
+          const yBase = lerp(seaTop + H * 0.014, seaBottom - H * 0.028, ratio);
+          const amplitude = H * lerp(0.0032, 0.0105, ratio);
+          const frequency = lerp(0.82, 2.55, ratio);
+          const speed = lerp(0.00024, 0.00088, ratio);
+          const phase = i * 0.76 + 0.4;
+          const skew = lerp(-0.012, -0.048, ratio);
+          const color = mixColor([255, 164, 96], [118, 180, 214], 0.28 + ratio * 0.58 + nightProgress * 0.1);
+          const alpha = lerp(0.11, 0.03, ratio) * (0.82 - nightProgress * 0.28 + sunGlowFade * 0.18);
+
+          traceSeaFlowLine(yBase, amplitude, frequency, speed, phase, skew, t);
+          cx.strokeStyle = rgba(color, alpha);
+          cx.lineWidth = lerp(1.35, 0.7, ratio);
+          cx.stroke();
+        }
+
+        cx.globalCompositeOperation = "multiply";
+        for (let i = 0; i < bandCount - 1; i += 1) {
+          const ratio = i / (bandCount - 1);
+          const yBase = lerp(seaTop + H * 0.02, seaBottom - H * 0.022, ratio);
+          const amplitude = H * lerp(0.0026, 0.0082, ratio);
+          const frequency = lerp(0.94, 2.9, ratio);
+          const speed = lerp(0.00028, 0.00102, ratio);
+          const phase = i * 0.71 + 1.3;
+          const skew = lerp(-0.01, -0.041, ratio);
+          const alpha = lerp(0.2, 0.07, ratio) * (0.88 + nightProgress * 0.2);
+
+          traceSeaFlowLine(yBase, amplitude, frequency, speed, phase, skew, t);
+          cx.strokeStyle = `rgba(8, 10, 22, ${alpha})`;
+          cx.lineWidth = lerp(2.4, 0.95, ratio);
+          cx.stroke();
+        }
+
+        cx.globalCompositeOperation = "screen";
+        const glintBaseAlpha = 0.06 + sunGlowFade * 0.08 + (1 - nightProgress) * 0.025;
+        cx.lineCap = "round";
+        for (let i = 0; i < 28; i += 1) {
+          const depth = hash(i * 17.3 + 4.7);
+          const flow = (hash(i * 8.1 + 2.9) + t * (0.000012 + depth * 0.00001)) % 1.18 - 0.09;
+          const x = flow * W;
+          const y =
+            lerp(seaTop + H * 0.018, seaBottom - H * 0.055, depth) +
+            Math.sin(t * 0.0009 + i * 1.7) * H * 0.0032;
+          const width = W * lerp(0.02, 0.007, depth);
+          const alpha = glintBaseAlpha * (0.55 + Math.sin(t * 0.0016 + i * 2.1) * 0.45) * (1 - depth * 0.55);
+
+          cx.beginPath();
+          cx.moveTo(x - width * 0.5, y);
+          cx.lineTo(x + width * 0.5, y);
+          cx.strokeStyle = `rgba(255, 241, 214, ${alpha})`;
+          cx.lineWidth = Math.max(0.8, H * lerp(0.0018, 0.0009, depth));
+          cx.stroke();
+        }
+
+        cx.restore();
+      }
+
+      function drawFoam(t) {
+        foams.forEach((foam) => {
+          const fx = ((foam.offset + t * foam.drift) % 1.28 - 0.12) * W;
+          const clampedX = clamp(fx, 0, W);
+          const fy =
+            diagY(clampedX / W) +
+            H * 0.004 +
+            foam.band * H +
+            Math.sin(t * 0.0014 + foam.pulse) * H * 0.0045;
+
+          cx.beginPath();
+          cx.arc(fx, fy, foam.r, 0, Math.PI * 2);
+          cx.fillStyle = `rgba(255, 247, 238, ${foam.a})`;
+          cx.fill();
+        });
+      }
+
+      function drawScene(ts) {
+        if (ts - lastSceneFrame < sceneFrameMs()) {
+          requestAnimationFrame(drawScene);
+          return;
+        }
+
+        lastSceneFrame = ts;
+        T = ts;
+        const horizonY = H * 0.568;
+        const sceneTime = getPlaybackTime();
+        const songProgress = getPlaybackProgress();
+        const duskProgress = smoothstep(0.02, 0.68, songProgress);
+        const nightProgress = smoothstep(0.14, 1, songProgress);
+        const deepNightProgress = smoothstep(0.7, 1, songProgress);
+        const sunSinkProgress = smoothstep(0.18, 0.88, songProgress);
+        const sunFade = 1 - smoothstep(0.38, 0.84, songProgress);
+        const sunCoreFade = Math.pow(sunFade, 1.35);
+        const sunGlowFade = Math.pow(sunFade, 2.2);
+        const rayIntensity = Math.pow(1 - smoothstep(0.16, 0.56, songProgress), 1.7);
+        const chorusLightIntensity = getTimedWindowIntensity(sceneTime, CHORUS_WINDOWS);
+        const finalBlackoutIntensity = getFinalBlackoutIntensity(sceneTime);
+
+        syncFinalBlackout(finalBlackoutIntensity);
+
+        const skyTopColor = mixColor([7, 4, 26], [2, 3, 12], nightProgress);
+        const skyUpperColor = mixColor([18, 6, 46], [6, 8, 22], nightProgress);
+        const skyMidColor = mixColor([67, 13, 36], [10, 12, 30], nightProgress);
+        const skyLowerColor = mixColor([182, 51, 8], [14, 16, 36], duskProgress);
+        const skyGlowColor = mixColor([227, 90, 12], [18, 20, 40], nightProgress);
+        const skyHorizonColor = mixColor([238, 158, 34], [24, 28, 48], nightProgress);
+
+        const sky = cx.createLinearGradient(0, 0, 0, horizonY * 1.05);
+        sky.addColorStop(0, rgb(skyTopColor));
+        sky.addColorStop(0.24, rgb(skyUpperColor));
+        sky.addColorStop(0.5, rgb(skyMidColor));
+        sky.addColorStop(0.68, rgb(skyLowerColor));
+        sky.addColorStop(0.83, rgb(skyGlowColor));
+        sky.addColorStop(1, rgb(skyHorizonColor));
+        cx.fillStyle = sky;
+        cx.fillRect(0, 0, W, horizonY * 1.06);
+
+        const starVisibility = smoothstep(0.36, 1, songProgress) * (getQuality().cloudDetail >= 3 ? 0.45 : 1);
+        if (starVisibility > 0.001) {
+          stars.forEach((star) => {
+            star.tw += star.sp;
+            const alpha = star.a * (0.6 + Math.sin(star.tw) * 0.4) * starVisibility;
+            const sy = star.y * horizonY * 0.82;
+            if (sy > horizonY * 0.48) {
+              return;
+            }
+
+            cx.beginPath();
+            cx.arc(star.x * W, sy, star.r, 0, Math.PI * 2);
+            cx.fillStyle = `rgba(255, 240, 205, ${alpha})`;
+            cx.fill();
+          });
+        }
+
+        if (getQuality().cloudDetail >= 3) {
+          drawSkySmoke(horizonY, nightProgress, deepNightProgress);
+        }
+
+        const sunX = W * 0.6;
+        const sunY = horizonY * 0.932 + H * 0.098 * sunSinkProgress;
+        const sunR = H * lerp(0.044, 0.021, smoothstep(0.32, 1, songProgress));
+
+        if (sunCoreFade > 0.003) {
+          const glowRadius = sunR * lerp(11, 4.5, smoothstep(0.34, 1, songProgress));
+          const glow = cx.createRadialGradient(sunX, sunY, 0, sunX, sunY, glowRadius);
+          glow.addColorStop(0, `rgba(255, 208, 78, ${0.42 * sunGlowFade})`);
+          glow.addColorStop(0.18, `rgba(255, 138, 28, ${0.22 * sunGlowFade})`);
+          glow.addColorStop(0.45, `rgba(218, 58, 8, ${0.075 * sunGlowFade})`);
+          glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+          cx.beginPath();
+          cx.arc(sunX, sunY, glowRadius, 0, Math.PI * 2);
+          cx.fillStyle = glow;
+          cx.fill();
+
+          const disc = cx.createRadialGradient(sunX, sunY - sunR * 0.2, 0, sunX, sunY, sunR);
+          disc.addColorStop(0, rgba(mixColor([255, 230, 136], [255, 184, 112], duskProgress), sunCoreFade));
+          disc.addColorStop(0.5, rgba(mixColor([255, 174, 38], [186, 78, 34], smoothstep(0.26, 1, songProgress)), sunCoreFade));
+          disc.addColorStop(1, rgba(mixColor([255, 108, 14], [76, 28, 22], deepNightProgress), sunCoreFade));
+          cx.beginPath();
+          cx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+          cx.fillStyle = disc;
+          cx.fill();
+        }
+
+        drawGodRays(sunX, sunY, T, rayIntensity);
+        if (getQuality().cloudDetail < 3) {
+          const visibleCloudCount = getQuality().cloudCount;
+          CLOUDS.slice(0, visibleCloudCount).forEach((cloud) => drawCloud(cloud, T));
+        }
+        drawFinaleFireworks(sceneTime, horizonY, T);
+        drawChorusHeadlandLights(horizonY, chorusLightIntensity, T);
+        drawHeadland(horizonY);
+        drawHeadlandLightSource(horizonY, chorusLightIntensity, T);
+
+        const seaTop = horizonY * 0.983;
+        const seaBottom = H * 0.84;
+        const sea = cx.createLinearGradient(0, seaTop, 0, seaBottom);
+        sea.addColorStop(0, rgb(mixColor([182, 58, 12], [44, 32, 56], nightProgress)));
+        sea.addColorStop(0.14, rgb(mixColor([134, 40, 20], [24, 26, 58], nightProgress)));
+        sea.addColorStop(0.34, rgb(mixColor([54, 22, 38], [16, 20, 46], nightProgress)));
+        sea.addColorStop(0.65, rgb(mixColor([22, 20, 44], [10, 14, 32], nightProgress)));
+        sea.addColorStop(1, rgb(mixColor([13, 13, 24], [5, 8, 18], nightProgress)));
+        cx.fillStyle = sea;
+        cx.fillRect(0, seaTop, W, seaBottom - seaTop);
+
+        drawSeaSurfaceTexture(seaTop, seaBottom, T, nightProgress, sunGlowFade);
+
+        if (sunGlowFade > 0.003) {
+          cx.save();
+          const reflectionWidth = W * lerp(0.12, 0.07, nightProgress);
+          const mask = cx.createLinearGradient(sunX - reflectionWidth, 0, sunX + reflectionWidth, 0);
+          mask.addColorStop(0, "rgba(0, 0, 0, 0)");
+          mask.addColorStop(0.5, "rgba(255, 255, 255, 1)");
+          mask.addColorStop(1, "rgba(0, 0, 0, 0)");
+          const reflection = cx.createLinearGradient(0, seaTop, 0, H * 0.72);
+          reflection.addColorStop(0, `rgba(255, 158, 52, ${0.52 * sunGlowFade})`);
+          reflection.addColorStop(0.4, `rgba(208, 74, 18, ${0.22 * sunGlowFade})`);
+          reflection.addColorStop(1, "rgba(0, 0, 0, 0)");
+          cx.globalCompositeOperation = "source-atop";
+          cx.fillStyle = reflection;
+          cx.fillRect(0, seaTop, W, H * 0.72 - seaTop);
+          cx.globalCompositeOperation = "multiply";
+          cx.fillStyle = mask;
+          cx.fillRect(0, seaTop, W, H * 0.72 - seaTop);
+          cx.restore();
+        }
+
+        cx.save();
+        cx.globalAlpha = lerp(0.05, 0.014, nightProgress);
+        const shimmerLines = getQuality().shimmerLines;
+        for (let i = 0; i < shimmerLines; i += 1) {
+          const ratio = i / shimmerLines;
+          const leftY = seaTop + ratio * (H * 0.77 - seaTop);
+          const rightY = seaTop + ratio * (H * 0.61 - seaTop);
+          const offset = Math.sin(T * 0.00072 + i * 0.7) * W * 0.024;
+          cx.beginPath();
+          cx.moveTo(offset, leftY);
+          cx.lineTo(W + offset, rightY);
+          cx.strokeStyle = "rgba(255, 184, 88, 1)";
+          cx.lineWidth = lerp(0.4, 1.7, 1 - ratio);
+          cx.stroke();
+        }
+        cx.restore();
+
+        WAVES.forEach((wave, index) => {
+          const points = drawWaveBand(wave, index, T);
+          if (index < 2) {
+            drawWaveFoamSegments(points, wave.crest, T, index + 1);
+          }
+        });
+
+        drawFoam(T);
+
+        if (sandEdgeCache) {
+          const animatedPoints = sandEdgeCache.map((point) => ({
+            x: point.x,
+            y: sandYAnim(point.x, T)
+          }));
+
+          cx.save();
+          cx.beginPath();
+          cx.moveTo(0, H);
+          cx.lineTo(animatedPoints[0].x, animatedPoints[0].y);
+          for (let i = 1; i < animatedPoints.length; i += 1) {
+            cx.lineTo(animatedPoints[i].x, animatedPoints[i].y);
+          }
+          cx.lineTo(W, H);
+          cx.closePath();
+          cx.clip();
+
+          cx.drawImage(sandCv, 0, H * 0.58, W, H - H * 0.58);
+
+          const sandShade = cx.createLinearGradient(0, H * 0.7, 0, H);
+          sandShade.addColorStop(0, "rgba(92, 50, 16, 0.56)");
+          sandShade.addColorStop(0.3, "rgba(128, 72, 22, 0.35)");
+          sandShade.addColorStop(0.7, "rgba(152, 92, 33, 0.2)");
+          sandShade.addColorStop(1, "rgba(162, 98, 38, 0.1)");
+          cx.fillStyle = sandShade;
+          cx.fillRect(0, H * 0.58, W, H);
+          cx.restore();
+
+          cx.save();
+          const wetWidth = H * 0.052;
+          const wetBand = cx.createLinearGradient(0, sandYAnim(W / 2, T) - H * 0.01, 0, sandYAnim(W / 2, T) + wetWidth);
+          wetBand.addColorStop(0, "rgba(198, 108, 38, 0)");
+          wetBand.addColorStop(0.32, "rgba(220, 132, 56, 0.5)");
+          wetBand.addColorStop(0.65, "rgba(160, 74, 28, 0.34)");
+          wetBand.addColorStop(1, "rgba(178, 98, 38, 0)");
+          cx.fillStyle = wetBand;
+          cx.beginPath();
+          cx.moveTo(animatedPoints[0].x, animatedPoints[0].y - H * 0.008);
+          for (let i = 1; i < animatedPoints.length; i += 1) {
+            cx.lineTo(animatedPoints[i].x, animatedPoints[i].y - H * 0.008);
+          }
+          for (let i = animatedPoints.length - 1; i >= 0; i -= 1) {
+            cx.lineTo(animatedPoints[i].x, animatedPoints[i].y + wetWidth);
+          }
+          cx.closePath();
+          cx.fill();
+
+          cx.beginPath();
+          cx.moveTo(animatedPoints[0].x, animatedPoints[0].y);
+          for (let i = 1; i < animatedPoints.length; i += 1) {
+            cx.lineTo(animatedPoints[i].x, animatedPoints[i].y);
+          }
+          cx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+          cx.lineWidth = 1.8;
+          cx.stroke();
+          cx.restore();
+        }
+
+        const palmScale = H / 700;
+        drawPalm(W * 0.833, getPalmBaseY(W * 0.833), 1.1 * palmScale, false, T);
+        drawPalm(W * 0.903, getPalmBaseY(W * 0.903), 0.88 * palmScale, false, T);
+        drawPalm(W * 0.76, getPalmBaseY(W * 0.76), 0.82 * palmScale, true, T);
+        drawPalm(W * 0.966, getPalmBaseY(W * 0.966), 0.72 * palmScale, false, T);
+
+        const haze = cx.createLinearGradient(0, horizonY * 0.82, 0, horizonY * 1.1);
+        haze.addColorStop(0, "rgba(212, 73, 16, 0)");
+        haze.addColorStop(0.4, `rgba(212, 73, 16, ${0.1 * (1 - nightProgress * 0.7)})`);
+        haze.addColorStop(1, "rgba(212, 73, 16, 0)");
+        cx.fillStyle = haze;
+        cx.fillRect(0, horizonY * 0.82, W, horizonY * 0.3);
+
+        if (nightProgress > 0.001) {
+          cx.save();
+          cx.globalCompositeOperation = "multiply";
+          const nightWash = cx.createLinearGradient(0, 0, 0, H);
+          nightWash.addColorStop(0, `rgba(8, 10, 24, ${0.12 + nightProgress * 0.26})`);
+          nightWash.addColorStop(0.56, `rgba(14, 12, 28, ${0.05 + nightProgress * 0.16})`);
+          nightWash.addColorStop(1, `rgba(18, 14, 24, ${0.02 + deepNightProgress * 0.12})`);
+          cx.fillStyle = nightWash;
+          cx.fillRect(0, 0, W, H);
+          cx.restore();
+        }
+
+        const vignette = cx.createRadialGradient(W / 2, H / 2, H * 0.28, W / 2, H / 2, H * 0.88);
+        vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
+        vignette.addColorStop(1, `rgba(0, 0, 0, ${0.5 + nightProgress * 0.18})`);
+        cx.fillStyle = vignette;
+        cx.fillRect(0, 0, W, H);
+
+        requestAnimationFrame(drawScene);
+      }
+
+      function parseTimestamp(min, sec, msRaw) {
+        const ms = Number((msRaw || "0").padEnd(3, "0"));
+        return Number(min) * 60 + Number(sec) + ms / 1000;
+      }
+
+      function cleanWord(text) {
+        return String(text || "").replace(/\s+/g, " ").trim();
+      }
+
+      function parseLrc(rawText) {
+        const cleaned = rawText
+          .replace(/\r/g, "")
+          .replace(/\\\[/g, "[")
+          .replace(/\\\]/g, "]")
+          .replace(/\u00a0/g, " ");
+
+        const tokenPattern = /\[(\d{2}):(\d{2})(?:\.(\d{1,3}))?\]([^\[]*)/g;
+        const words = [];
+        let match = tokenPattern.exec(cleaned);
+
+        while (match) {
+          const text = cleanWord(match[4]);
+          if (text) {
+            words.push({
+              time: parseTimestamp(match[1], match[2], match[3]),
+              text
+            });
+          }
+          match = tokenPattern.exec(cleaned);
+        }
+
+        return words.sort((a, b) => a.time - b.time);
+      }
+
+      function isTripleDotLyric(text) {
+        return typeof text === "string" && text.replace(/\s+/g, "") === "...";
+      }
+
+      function isLyricContinuation(previousText, nextText) {
+        const previous = cleanWord(previousText);
+        const next = cleanWord(nextText);
+
+        if (!previous || !next || isTripleDotLyric(previous) || isTripleDotLyric(next)) {
+          return false;
+        }
+
+        return next === previous || next.startsWith(previous);
+      }
+
+      function normalizeLyricBursts(words) {
+        const normalized = [];
+
+        words.forEach((word) => {
+          const lastWord = normalized[normalized.length - 1];
+          if (
+            lastWord &&
+            word.time - lastWord.time <= LYRIC_BURST_MIN_STEP &&
+            isLyricContinuation(lastWord.text, word.text)
+          ) {
+            normalized[normalized.length - 1] = word;
+            return;
+          }
+
+          normalized.push(word);
+        });
+
+        return normalized;
+      }
+
+      function setStatus(message, isError = false) {
+        statusText.textContent = message;
+        statusText.style.color = isError ? "#cc0000" : "#666";
+        statusText.style.opacity = message ? "1" : "0";
+      }
+
+      function updateReadyState() {
+        if (sequenceLockedAfterEnding) {
+          startBtn.hidden = true;
+          startBtn.disabled = true;
+          setStatus("");
+          return;
+        }
+
+        if (lyricsLoaded) {
+          startBtn.disabled = false;
+          setStatus(`Listo. ${loadedLyricLineCount || lyricWords.length} lineas cargadas.`);
+          return;
+        }
+
+        startBtn.disabled = true;
+        setStatus("Cargando timestamps...");
+      }
+
+      function findWordIndex(currentTime) {
+        let low = 0;
+        let high = lyricWords.length - 1;
+        let result = -1;
+
+        while (low <= high) {
+          const mid = Math.floor((low + high) / 2);
+          if (lyricWords[mid].time <= currentTime) {
+            result = mid;
+            low = mid + 1;
+          } else {
+            high = mid - 1;
+          }
+        }
+
+        return result;
+      }
+
+      function updateLyrics(currentTime, force = false) {
+        if (!lyricWords.length) {
+          return;
+        }
+
+        const nextIndex = findWordIndex(currentTime);
+        if (!force && nextIndex === activeWordIndex) {
+          return;
+        }
+
+        activeWordIndex = nextIndex;
+
+        if (nextIndex < 0) {
+          lyricEl.textContent = "";
+          lyricEl.classList.add("is-empty");
+          return;
+        }
+
+        const word = lyricWords[nextIndex].text;
+        const visibleWord = isTripleDotLyric(word) ? "" : word;
+
+        lyricEl.textContent = visibleWord;
+        lyricEl.classList.toggle("is-empty", !visibleWord);
+      }
+
+      function fadeIntroOverlay() {
+        if (!introOverlay || introOverlay.hidden || introOverlay.classList.contains("is-fading")) {
+          return;
+        }
+
+        introOverlay.classList.add("is-fading");
+      }
+
+      function resetLyrics() {
+        activeWordIndex = -1;
+        lyricEl.textContent = "";
+        lyricEl.classList.add("is-empty");
+      }
+
+      function stopSyncLoop() {
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+      }
+
+      function syncLoop() {
+        updateLyrics(audio.currentTime);
+        rafId = requestAnimationFrame(syncLoop);
+      }
+
+      function startSyncLoop() {
+        if (rafId === null) {
+          rafId = requestAnimationFrame(syncLoop);
+        }
+      }
+
+      async function startSequenceFromBeginning() {
+        if (!lyricWords.length) {
+          return;
+        }
+
+        sequenceLockedAfterEnding = false;
+        fadeIntroOverlay();
+        syncFinalBlackout(0);
+        resetLyrics();
+        audio.currentTime = 0;
+        updateLyrics(0, true);
+
+        try {
+          await audio.play();
+          startBtn.hidden = true;
+          setStatus("");
+        } catch (error) {
+          setStatus("No se pudo iniciar. Presiona de nuevo.", true);
+          console.error(error);
+        }
+      }
+
+      async function loadLyrics() {
+        try {
+          const response = await fetch(encodeURI(LRC_PATH));
+          if (!response.ok) {
+            throw new Error(`No se pudo cargar ${LRC_PATH}`);
+          }
+
+          const rawLrc = await response.text();
+          const parsedLyricWords = parseLrc(rawLrc);
+          loadedLyricLineCount = parsedLyricWords.length;
+          lyricWords = normalizeLyricBursts(parsedLyricWords);
+          finaleFireworkBursts = buildFinaleFireworkBursts(parsedLyricWords);
+          finalBlackoutStartTime = buildFinalBlackoutStartTime(parsedLyricWords);
+
+          if (!lyricWords.length) {
+            throw new Error("El archivo LRC no tiene timestamps validos.");
+          }
+
+          lyricsLoaded = true;
+          updateReadyState();
+
+          if (autoStart && !autoStartConsumed) {
+            autoStartConsumed = true;
+            await startSequenceFromBeginning();
+          }
+        } catch (error) {
+          lyricsLoaded = false;
+          loadedLyricLineCount = 0;
+          finaleFireworkBursts = [];
+          finalBlackoutStartTime = null;
+          startBtn.disabled = true;
+          lyricEl.textContent = "Error";
+          lyricEl.classList.remove("is-empty");
+          setStatus("No se pudo cargar el LRC. Usa un servidor local.", true);
+          console.error(error);
+        }
+      }
+
+      startBtn.addEventListener("click", async () => {
+        await startSequenceFromBeginning();
+      });
+
+      audio.addEventListener("play", () => startSyncLoop());
+      audio.addEventListener("pause", () => stopSyncLoop());
+      audio.addEventListener("seeked", () => updateLyrics(audio.currentTime, true));
+      audio.addEventListener("ended", () => {
+        stopSyncLoop();
+        resetLyrics();
+        setStatus("");
+        sequenceLockedAfterEnding = true;
+        startBtn.hidden = true;
+        startBtn.disabled = true;
+      });
+
+      if (introOverlay) {
+        introOverlay.addEventListener("animationend", () => {
+          introOverlay.hidden = true;
+        }, { once: true });
+      }
+
+      syncFinalBlackout(0);
+      resizeScene();
+      requestAnimationFrame(drawScene);
+      updateReadyState();
+      loadLyrics();
+    </script>
+  </body>
+</html>

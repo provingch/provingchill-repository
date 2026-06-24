@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Somewhere Only We Know - Keane</title>
+    <link rel="icon" type="image/jpeg" href="media/favicon.jpg">
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+      }
+
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        min-height: 100dvh;
+        background: #000;
+        color: #fff;
+        font-family: "Arial Black", "Impact", sans-serif;
+      }
+
+      /* scene and stage always visible */
+      .scene,
+      .stage {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .scene {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+      }
+
+      #scene-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .grain {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 15% 25%, rgba(255, 255, 255, 0.03) 0 1px, transparent 1.6px) 0 0 / 4px 4px,
+          radial-gradient(circle at 80% 64%, rgba(255, 255, 255, 0.02) 0 1px, transparent 1.8px) 0 0 / 5px 5px;
+        opacity: 0.07;
+      }
+
+      .stage {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.2rem;
+        padding: 1.2rem;
+        z-index: 102;
+      }
+
+
+
+      .button-container {
+        position: relative;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.8rem;
+      }
+
+      .start-btn {
+        /* match golden hour debug-like button */
+        font: inherit;
+        font-size: 0.95rem;
+        border: 1px solid #454545;
+        background: #111;
+        color: #fff;
+        padding: 10px 18px;
+        border-radius: 6px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      .start-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .button-status {
+        order: 3;
+        margin: 0;
+        min-height: 1rem;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.9rem;
+        color: #d0d0d0;
+        text-align: center;
+      }
+
+      /* black screen overlay at start */
+      .black-overlay {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        z-index: 100;
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 0.8s ease-out, visibility 0.8s ease-out;
+        pointer-events: none;
+      }
+
+      .black-overlay.slow-return {
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 2.8s ease-in-out, visibility 2.8s ease-in-out;
+      }
+
+      .black-overlay.fade-out {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      /* hide controls when sequence has started, keep lyrics visible */
+      .sequence-started .button-container,
+      .sequence-started #status {
+        display: none !important;
+      }
+
+      .lyric {
+        margin: 0;
+        min-height: 1.1em;
+        max-width: min(95vw, 1200px);
+        font-size: clamp(1.8rem, 6vw, 4rem);
+        line-height: 1.03;
+        letter-spacing: 0.02em;
+        text-align: center;
+        text-wrap: balance;
+        text-shadow: 0 0 18px rgba(0, 0, 0, 0.96), 0 0 4px rgba(0, 0, 0, 0.96);
+        position: relative;
+        z-index: 111;
+      }
+
+      .song-timer {
+        margin: 0;
+        min-height: 1rem;
+        font-family: "Consolas", "Courier New", monospace;
+        font-size: clamp(0.78rem, 2.5vw, 1rem);
+        letter-spacing: 0.08em;
+        color: #efe5be;
+        text-shadow: 0 0 10px rgba(0, 0, 0, 0.85);
+        opacity: 0.95;
+      }
+
+      .lyric.is-empty {
+        opacity: 0;
+      }
+
+      .ghost-clock {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: min(24vw, 190px);
+        aspect-ratio: 1;
+        transform: translate(-50%, -50%);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 110;
+        opacity: 0;
+        mix-blend-mode: screen;
+      }
+
+      .ghost-clock-face {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 1px solid rgba(245, 236, 204, 0.26);
+        box-shadow: inset 0 0 36px rgba(238, 221, 164, 0.12), 0 0 26px rgba(212, 195, 136, 0.08);
+        background:
+          radial-gradient(circle at center, rgba(244, 235, 200, 0.08) 0 18%, rgba(233, 220, 172, 0.04) 35%, transparent 72%),
+          repeating-conic-gradient(from -90deg, rgba(255, 245, 208, 0.16) 0deg 1deg, transparent 1deg 30deg);
+      }
+
+      .ghost-clock-hand {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 2px;
+        height: 44%;
+        border-radius: 999px;
+        background: linear-gradient(to top, rgba(255, 248, 223, 0.22), rgba(255, 248, 223, 0.9));
+        transform: translate(-50%, -100%) rotate(0deg);
+        transform-origin: 50% 100%;
+        box-shadow: 0 0 12px rgba(255, 245, 204, 0.34);
+        opacity: 0.7;
+      }
+
+      .ghost-clock-hand::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: -6px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 245, 208, 0.78);
+        box-shadow: 0 0 10px rgba(255, 245, 208, 0.32);
+      }
+
+      .debug-panel {
+        position: fixed;
+        right: 10px;
+        bottom: 10px;
+        z-index: 140;
+        width: min(280px, 90vw);
+        padding: 10px 10px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 8px;
+        background: rgba(10, 10, 10, 0.72);
+        color: #e9e9e9;
+        font-family: "Consolas", "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.35;
+        backdrop-filter: blur(4px);
+      }
+
+      .debug-panel h3 {
+        margin: 0 0 8px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .debug-row {
+        display: grid;
+        grid-template-columns: 56px 1fr;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+
+      .debug-row input[type="text"] {
+        width: 100%;
+        padding: 4px 6px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.35);
+        color: #fff;
+        font: inherit;
+      }
+
+      .debug-row input[type="checkbox"] {
+        accent-color: #d6c890;
+      }
+
+      .debug-buttons {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+      }
+
+      .debug-buttons button,
+      .debug-seek button {
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #f2f2f2;
+        font: inherit;
+        padding: 4px 0;
+        cursor: pointer;
+      }
+
+      .debug-buttons button:hover,
+      .debug-seek button:hover {
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      .debug-seek {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 6px;
+      }
+
+      .debug-current {
+        margin-top: 4px;
+        opacity: 0.82;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="black-overlay" id="black-overlay"></div>
+
+    <div class="scene" aria-hidden="true">
+      <canvas id="scene-canvas"></canvas>
+      <div class="grain"></div>
+    </div>
+    <div id="ghost-clock" class="ghost-clock" aria-hidden="true">
+      <div class="ghost-clock-face"></div>
+      <div id="ghost-clock-hand" class="ghost-clock-hand"></div>
+    </div>
+
+    <main class="stage">
+      <div class="button-container">
+        <button id="start-btn" class="start-btn" disabled>Comenzar secuencia</button>
+      </div>
+      <p id="lyric" class="lyric"></p>
+      <p id="status" class="button-status">Cargando timestamps...</p>
+
+      <audio id="audio" preload="auto">
+        <source src="media/somewhereonlyweknow.mp3" type="audio/mpeg">
+        Tu navegador no soporta audio HTML5.
+      </audio>
+    </main>
+
+
+    <script>
+      const sceneCanvas = document.getElementById("scene-canvas");
+      const sceneCtx = sceneCanvas.getContext("2d");
+
+      const sceneState = {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        dpr: 1,
+        profile: null,
+        trees: [],
+        emergers: [],
+        stars: [],
+        scroll: 0,
+        lastTime: 0,
+        flashAimX: null,
+        lightIntensity: 0.5
+      };
+      const BASE_PATH_WIDTH_PX = 140;
+      const BPM_LIGHT_SECTIONS = [
+        { start: 48.58, end: 70.91, bpm: 43 },
+        {
+          start: 70.91,
+          end: 136.69,
+          bpm: 175.5,
+          accentPattern: [1.08]
+        },
+        {
+          start: 149.04,
+          end: 214.82,
+          bpm: 175.5,
+          accentPattern: [1.08]
+        }
+      ];
+      const BPM_SECTION_EDGE_TOLERANCE = 0.12;
+      const EXTRA_FLASHLIGHT_WINDOWS = [
+        { start: 93.22, end: 136.69 },
+        { start: 149.04, end: 214.82 }
+      ];
+      const EXTRA_FLASHLIGHT_FADE = 1.6;
+      const FLOOR_CLOCK_WINDOWS = [
+        { start: 115.75, end: 142.25 },
+        { start: 171.56, end: 214.82 }
+      ];
+      const FLOOR_CLOCK_FADE = 1;
+      const PATH_RISE_LIGHT_WINDOW = { start: 196.1, end: 203.47 };
+      const PATH_RISE_LIGHT_FADE = 0.9;
+      const EMERGE_WINDOW = { start: 196.1, end: 203.47 };
+      const EMERGE_FADE = 0.9;
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function randomBetween(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
+      function getSceneProfile(width) {
+        if (width < 700) {
+          return {
+            treeDensity: 15,
+            treeCountMin: 40,
+            treeCountMax: 112,
+            forkCount: 5,
+            treeScale: 0.72,
+            treeSpread: 90,
+            treeBandMax: 2.1,
+            forkOffsetMin: 0.16,
+            forkOffsetMax: 0.26,
+            forkLengthMin: 120,
+            forkLengthMax: 220,
+            treeSpeedMin: 18,
+            treeSpeedMax: 36,
+            forwardSpeed: 36,
+            stripeSpeed: 110,
+            beamLengthRatio: 0.44,
+            beamEndHalfRatio: 0.16,
+            flashDarkness: 0.9,
+            playerYRatio: 0.84
+          };
+        }
+
+        if (width < 1200) {
+          return {
+            treeDensity: 12,
+            treeCountMin: 62,
+            treeCountMax: 148,
+            forkCount: 6,
+            treeScale: 0.9,
+            treeSpread: 120,
+            treeBandMax: 2.7,
+            forkOffsetMin: 0.18,
+            forkOffsetMax: 0.3,
+            forkLengthMin: 150,
+            forkLengthMax: 260,
+            treeSpeedMin: 24,
+            treeSpeedMax: 46,
+            forwardSpeed: 46,
+            stripeSpeed: 150,
+            beamLengthRatio: 0.46,
+            beamEndHalfRatio: 0.15,
+            flashDarkness: 0.92,
+            playerYRatio: 0.83
+          };
+        }
+
+        return {
+          treeDensity: 10,
+          treeCountMin: 88,
+          treeCountMax: 190,
+          forkCount: 7,
+          treeScale: 1,
+          treeSpread: 160,
+          treeBandMax: 3.6,
+          forkOffsetMin: 0.2,
+          forkOffsetMax: 0.34,
+          forkLengthMin: 180,
+          forkLengthMax: 300,
+          treeSpeedMin: 30,
+          treeSpeedMax: 56,
+          forwardSpeed: 56,
+          stripeSpeed: 190,
+          beamLengthRatio: 0.5,
+          beamEndHalfRatio: 0.13,
+          flashDarkness: 0.93,
+          playerYRatio: 0.82
+        };
+      }
+
+      function getPathWidth() {
+        return Math.min(BASE_PATH_WIDTH_PX, sceneState.width * 0.82);
+      }
+
+      function getTreeDeviceFactor() {
+        const memory = Number(navigator.deviceMemory || 4);
+        const cores = Number(navigator.hardwareConcurrency || 4);
+
+        if (memory <= 2 || cores <= 2) {
+          return 0.72;
+        }
+        if (memory <= 4 || cores <= 4) {
+          return 0.88;
+        }
+        if (memory >= 8 && cores >= 8) {
+          return 1.15;
+        }
+        return 1;
+      }
+
+      function getTargetTreeCount() {
+        const viewportArea = sceneState.width * sceneState.height;
+        const rawCount = Math.round((viewportArea / 100000) * sceneState.profile.treeDensity * getTreeDeviceFactor());
+        return Math.round(clamp(rawCount, sceneState.profile.treeCountMin, sceneState.profile.treeCountMax));
+      }
+
+      function randomTreeBand() {
+        return randomBetween(0.12, sceneState.profile.treeBandMax || 1.9);
+      }
+
+      function createTree() {
+        const side = Math.random() > 0.5 ? 1 : -1;
+        const y = randomBetween(-sceneState.height, sceneState.height + 120);
+        return {
+          side,
+          y,
+          lane: randomBetween(0.1, 1),
+          band: randomTreeBand(),
+          jitter: randomBetween(-1, 1),
+          scale: randomBetween(0.72, 1.42),
+          speed: randomBetween(sceneState.profile.treeSpeedMin, sceneState.profile.treeSpeedMax),
+          tint: randomBetween(-12, 18)
+        };
+      }
+
+      function createStar() {
+        return {
+          x: randomBetween(0, sceneState.width),
+          y: randomBetween(0, sceneState.height * 0.52),
+          r: randomBetween(0.35, 1.8),
+          a: randomBetween(0.05, 0.22),
+          tw: randomBetween(0.2, 1.1),
+          ph: randomBetween(0, Math.PI * 2)
+        };
+      }
+
+      function createEmerger() {
+        return {
+          side: Math.random() > 0.5 ? 1 : -1,
+          lane: randomBetween(0.1, 1),
+          width: randomBetween(7, 15),
+          height: randomBetween(24, 72),
+          tilt: randomBetween(-0.18, 0.18),
+          delay: randomBetween(0, 1.35),
+          speed: randomBetween(0.72, 1.28),
+          flicker: randomBetween(0, Math.PI * 2)
+        };
+      }
+
+      function initSceneObjects() {
+        sceneState.trees = [];
+        sceneState.emergers = [];
+        sceneState.stars = [];
+        sceneState.flashAimX = sceneState.width * 0.5;
+        const treeCount = getTargetTreeCount();
+
+        for (let i = 0; i < treeCount; i += 1) {
+          sceneState.trees.push(createTree());
+        }
+
+        const starCount = Math.max(40, Math.floor(sceneState.width / 18));
+        for (let i = 0; i < starCount; i += 1) {
+          sceneState.stars.push(createStar());
+        }
+
+        const emergerCount = sceneState.width < 700 ? 8 : sceneState.width < 1200 ? 11 : 14;
+        for (let i = 0; i < emergerCount; i += 1) {
+          sceneState.emergers.push(createEmerger());
+        }
+      }
+
+      function resizeScene() {
+        const viewportWidth = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+        const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
+        sceneState.width = Math.max(1, Math.floor(viewportWidth));
+        sceneState.height = Math.max(1, Math.floor(viewportHeight));
+        sceneState.profile = getSceneProfile(sceneState.width);
+        sceneState.dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        sceneCanvas.width = Math.floor(sceneState.width * sceneState.dpr);
+        sceneCanvas.height = Math.floor(sceneState.height * sceneState.dpr);
+        sceneCanvas.style.width = `${sceneState.width}px`;
+        sceneCanvas.style.height = `${sceneState.height}px`;
+        sceneCtx.setTransform(sceneState.dpr, 0, 0, sceneState.dpr, 0, 0);
+
+        initSceneObjects();
+      }
+
+      function pathCenterAt() {
+        return sceneState.width * 0.5;
+      }
+
+      function drawSky(timeSeconds) {
+        const width = sceneState.width;
+        const height = sceneState.height;
+
+        const sky = sceneCtx.createLinearGradient(0, 0, 0, height);
+        sky.addColorStop(0, "#101a2a");
+        sky.addColorStop(0.45, "#0b1320");
+        sky.addColorStop(1, "#04080f");
+        sceneCtx.fillStyle = sky;
+        sceneCtx.fillRect(0, 0, width, height);
+
+        for (const star of sceneState.stars) {
+          const twinkle = 0.45 + 0.55 * Math.sin(timeSeconds * star.tw + star.ph);
+          const alpha = star.a * twinkle;
+          sceneCtx.fillStyle = `rgba(208, 218, 235, ${alpha.toFixed(3)})`;
+          sceneCtx.beginPath();
+          sceneCtx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+          sceneCtx.fill();
+        }
+
+        const haze = sceneCtx.createLinearGradient(0, height * 0.36, 0, height);
+        haze.addColorStop(0, "rgba(9, 14, 22, 0)");
+        haze.addColorStop(1, "rgba(2, 5, 9, 0.46)");
+        sceneCtx.fillStyle = haze;
+        sceneCtx.fillRect(0, height * 0.36, width, height * 0.64);
+      }
+
+      function drawGround() {
+        const width = sceneState.width;
+        const height = sceneState.height;
+
+        const grass = sceneCtx.createLinearGradient(0, height * 0.34, 0, height);
+        grass.addColorStop(0, "rgba(18, 30, 22, 0.62)");
+        grass.addColorStop(0.55, "rgba(12, 22, 16, 0.86)");
+        grass.addColorStop(1, "rgba(7, 12, 9, 0.98)");
+        sceneCtx.fillStyle = grass;
+        sceneCtx.fillRect(0, 0, width, height);
+      }
+
+      function drawPath(timeSeconds) {
+        const width = sceneState.width;
+        const height = sceneState.height;
+        const pathHalf = getPathWidth() / 2;
+        const step = 18;
+        const left = [];
+        const right = [];
+
+        for (let y = -20; y <= height + 24; y += step) {
+          const center = pathCenterAt();
+          left.push({ x: center - pathHalf, y });
+          right.push({ x: center + pathHalf, y });
+        }
+
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(left[0].x, left[0].y);
+        for (let i = 1; i < left.length; i += 1) {
+          sceneCtx.lineTo(left[i].x, left[i].y);
+        }
+        for (let i = right.length - 1; i >= 0; i -= 1) {
+          sceneCtx.lineTo(right[i].x, right[i].y);
+        }
+        sceneCtx.closePath();
+
+        const asphalt = sceneCtx.createLinearGradient(0, 0, 0, height);
+        asphalt.addColorStop(0, "rgba(120, 80, 40, 0.5)");
+        asphalt.addColorStop(0.62, "rgba(80, 50, 20, 0.8)");
+        asphalt.addColorStop(1, "rgba(50, 30, 10, 0.95)");
+        sceneCtx.fillStyle = asphalt;
+        sceneCtx.fill();
+
+        sceneCtx.strokeStyle = "rgba(198, 184, 132, 0.35)";
+        sceneCtx.lineWidth = 2;
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(left[0].x, left[0].y);
+        for (let i = 1; i < left.length; i += 1) {
+          sceneCtx.lineTo(left[i].x, left[i].y);
+        }
+        sceneCtx.stroke();
+
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(right[0].x, right[0].y);
+        for (let i = 1; i < right.length; i += 1) {
+          sceneCtx.lineTo(right[i].x, right[i].y);
+        }
+        sceneCtx.stroke();
+
+        // Rayas del camino quitadas para look más natural
+      }
+
+
+
+
+
+      function drawTree(tree, timeSeconds) {
+        const width = sceneState.width;
+        const pathHalf = getPathWidth() / 2;
+        const center = width * 0.5;
+        const shoulder = 14 + tree.lane * 22;
+        const forestOffset = tree.band * sceneState.profile.treeSpread;
+        const jitter = tree.jitter * sceneState.profile.treeSpread * 0.38;
+        let x = center + tree.side * (pathHalf + shoulder + forestOffset) + jitter;
+        const minDistanceToRoad = pathHalf + 12;
+        if (tree.side > 0) {
+          x = Math.max(center + minDistanceToRoad, x);
+        } else {
+          x = Math.min(center - minDistanceToRoad, x);
+        }
+        const size = (26 + tree.scale * 30 * sceneState.profile.treeScale) * (0.75 + tree.lane * 0.5);
+        const trunkW = Math.max(2, size * 0.16);
+        const trunkH = size * 0.7;
+
+        const baseR = Math.round(clamp(24 + tree.tint, 8, 62));
+        const baseG = Math.round(clamp(54 + tree.tint, 18, 104));
+        const baseB = Math.round(clamp(38 + tree.tint * 0.45, 10, 78));
+
+        sceneCtx.fillStyle = "rgba(20, 28, 22, 0.84)";
+        sceneCtx.fillRect(x - trunkW * 0.5, tree.y - trunkH, trunkW, trunkH);
+
+        sceneCtx.fillStyle = `rgba(${baseR}, ${baseG}, ${baseB}, 0.78)`;
+        sceneCtx.beginPath();
+        sceneCtx.arc(x, tree.y - trunkH - size * 0.44, size * 0.38, 0, Math.PI * 2);
+        sceneCtx.arc(x - size * 0.24, tree.y - trunkH - size * 0.18, size * 0.29, 0, Math.PI * 2);
+        sceneCtx.arc(x + size * 0.24, tree.y - trunkH - size * 0.18, size * 0.29, 0, Math.PI * 2);
+        sceneCtx.fill();
+      }
+
+      function updateAndDrawTrees(dt, timeSeconds) {
+        for (const tree of sceneState.trees) {
+          tree.y += tree.speed * dt;
+          if (tree.y > sceneState.height + 120) {
+            tree.y = -randomBetween(80, sceneState.height * 0.8);
+            tree.side = Math.random() > 0.5 ? 1 : -1;
+            tree.lane = randomBetween(0.1, 1);
+            tree.band = randomTreeBand();
+            tree.jitter = randomBetween(-1, 1);
+            tree.scale = randomBetween(0.72, 1.42);
+            tree.speed = randomBetween(sceneState.profile.treeSpeedMin, sceneState.profile.treeSpeedMax);
+            tree.tint = randomBetween(-12, 18);
+          }
+          drawTree(tree, timeSeconds);
+        }
+      }
+
+
+
+      function getActiveBpmSection(currentTime) {
+        for (let i = 0; i < BPM_LIGHT_SECTIONS.length; i += 1) {
+          const section = BPM_LIGHT_SECTIONS[i];
+          const nextSection = BPM_LIGHT_SECTIONS[i + 1] || null;
+          const startBound = section.start - BPM_SECTION_EDGE_TOLERANCE;
+          const endBoundWithTolerance = section.end + BPM_SECTION_EDGE_TOLERANCE;
+          const endBound = nextSection ? Math.min(endBoundWithTolerance, nextSection.start) : endBoundWithTolerance;
+
+          if (nextSection) {
+            if (currentTime >= startBound && currentTime < endBound) {
+              return section;
+            }
+          } else if (currentTime >= startBound && currentTime <= endBound) {
+            return section;
+          }
+        }
+
+        return null;
+      }
+
+      function isBpmWindowActive(currentTime) {
+        return getActiveBpmSection(currentTime) !== null;
+      }
+
+      function getBpmPulseIntensity(currentTime) {
+        const activeSection = getActiveBpmSection(currentTime);
+        if (!activeSection) {
+          return 0;
+        }
+
+        const beatDuration = 60 / activeSection.bpm;
+        const elapsed = currentTime - activeSection.start;
+        const beatIndex = Math.floor(elapsed / beatDuration);
+        const beatPhase = ((elapsed % beatDuration) + beatDuration) % beatDuration;
+        const normalizedPhase = beatPhase / beatDuration;
+        const pulseEnvelope = Math.exp(-normalizedPhase * 6.8);
+        const accentPattern = activeSection.accentPattern || [1];
+        const accentFactor = accentPattern[((beatIndex % accentPattern.length) + accentPattern.length) % accentPattern.length];
+        const pulse = pulseEnvelope * accentFactor;
+        return clamp(pulse, 0, 1.9);
+      }
+
+      function getFlashlightIntensity(currentTime) {
+        const baseIntensity = 0.2;
+        const beatPulse = getBpmPulseIntensity(currentTime);
+        const pulseMain = Math.min(beatPulse, 1) * 0.62;
+        const accentBoost = Math.max(0, beatPulse - 1) * 0.95;
+        return clamp(baseIntensity + pulseMain + accentBoost, 0.2, 1);
+      }
+
+      function getWindowVisibility(currentTime, windowRange, fadeSeconds = 0.8) {
+        if (currentTime < windowRange.start || currentTime > windowRange.end) {
+          return 0;
+        }
+
+        const fadeIn = clamp((currentTime - windowRange.start) / fadeSeconds, 0, 1);
+        const fadeOut = clamp((windowRange.end - currentTime) / fadeSeconds, 0, 1);
+        return Math.min(fadeIn, fadeOut);
+      }
+
+      function getMultiWindowVisibility(currentTime, windows, fadeSeconds = 0.8) {
+        let visibility = 0;
+        for (const windowRange of windows) {
+          visibility = Math.max(visibility, getWindowVisibility(currentTime, windowRange, fadeSeconds));
+        }
+        return visibility;
+      }
+
+      function getActiveWindow(currentTime, windows) {
+        for (const windowRange of windows) {
+          if (currentTime >= windowRange.start && currentTime <= windowRange.end) {
+            return windowRange;
+          }
+        }
+        return null;
+      }
+
+      function easeOutCubic(value) {
+        const t = clamp(value, 0, 1);
+        return 1 - (1 - t) * (1 - t) * (1 - t);
+      }
+
+      function updateGhostClock(currentTime) {
+        if (!ghostClockEl || !ghostClockHandEl) {
+          return;
+        }
+
+        const visibility = getMultiWindowVisibility(currentTime, FLOOR_CLOCK_WINDOWS, FLOOR_CLOCK_FADE);
+        if (!visibility) {
+          ghostClockEl.style.opacity = "0";
+          return;
+        }
+
+        const activeClockWindow = getActiveWindow(currentTime, FLOOR_CLOCK_WINDOWS) || FLOOR_CLOCK_WINDOWS[0];
+        const elapsed = Math.max(0, currentTime - activeClockWindow.start);
+        const tickStepSeconds = 1.35;
+        const tickIndex = Math.floor(elapsed / tickStepSeconds);
+        const secondsInMinute = (tickIndex * tickStepSeconds) % 60;
+        const handDeg = secondsInMinute * 6;
+        const tickProgress = (elapsed % tickStepSeconds) / tickStepSeconds;
+        const beatPulse = clamp(getBpmPulseIntensity(currentTime), 0, 1);
+        const opacity = clamp(0.22 + visibility * 0.36 + beatPulse * 0.06, 0.22, 0.62);
+        const handOpacity = clamp((0.26 + (1 - tickProgress) * 0.66) * visibility, 0.12, 0.92);
+
+        if (lyricEl) {
+          const lyricRect = lyricEl.getBoundingClientRect();
+          ghostClockEl.style.left = `${(lyricRect.left + lyricRect.width * 0.5).toFixed(1)}px`;
+          ghostClockEl.style.top = `${(lyricRect.top + lyricRect.height * 0.5).toFixed(1)}px`;
+        }
+
+        ghostClockEl.style.opacity = opacity.toFixed(3);
+        ghostClockEl.style.transform = "translate(-50%, -50%)";
+        ghostClockHandEl.style.transform = `translate(-50%, -100%) rotate(${handDeg.toFixed(3)}deg)`;
+        ghostClockHandEl.style.opacity = handOpacity.toFixed(3);
+      }
+
+      function drawEmergingThings(timeSeconds, currentTime) {
+        const windowVisibility = getWindowVisibility(currentTime, EMERGE_WINDOW, EMERGE_FADE);
+        if (!windowVisibility || !sceneState.emergers.length) {
+          return;
+        }
+
+        const elapsed = Math.max(0, currentTime - EMERGE_WINDOW.start);
+        const centerX = pathCenterAt();
+        const height = sceneState.height;
+        const pathHalf = getPathWidth() / 2;
+        const baseY = height * 0.93;
+        const beatPulse = clamp(getBpmPulseIntensity(currentTime), 0, 1);
+
+        sceneCtx.save();
+        sceneCtx.globalCompositeOperation = "screen";
+
+        for (const emerger of sceneState.emergers) {
+          const emergenceTime = Math.max(0, elapsed - emerger.delay);
+          const rawProgress = emergenceTime / (1.05 / emerger.speed);
+          const rise = easeOutCubic(rawProgress);
+          if (!rise) {
+            continue;
+          }
+
+          const x =
+            centerX +
+            emerger.side *
+              (pathHalf + 16 + emerger.lane * sceneState.profile.treeSpread * 0.62) +
+            Math.sin(timeSeconds * 1.7 + emerger.flicker) * 3;
+          const h = emerger.height * rise;
+          const w = emerger.width * (0.78 + rise * 0.38);
+          const alpha = (0.1 + rise * 0.26 + beatPulse * 0.1) * windowVisibility;
+          const glowAlpha = (0.05 + rise * 0.14 + beatPulse * 0.08) * windowVisibility;
+
+          sceneCtx.save();
+          sceneCtx.translate(x, baseY);
+          sceneCtx.rotate(emerger.tilt * (0.35 + rise * 0.65));
+
+          const bodyGrad = sceneCtx.createLinearGradient(0, -h, 0, 0);
+          bodyGrad.addColorStop(0, `rgba(188, 226, 255, ${alpha.toFixed(3)})`);
+          bodyGrad.addColorStop(1, `rgba(90, 132, 170, ${(alpha * 0.28).toFixed(3)})`);
+          sceneCtx.fillStyle = bodyGrad;
+          sceneCtx.beginPath();
+          sceneCtx.moveTo(-w * 0.55, 0);
+          sceneCtx.lineTo(-w * 0.42, -h * 0.78);
+          sceneCtx.quadraticCurveTo(0, -h * 1.08, w * 0.42, -h * 0.78);
+          sceneCtx.lineTo(w * 0.55, 0);
+          sceneCtx.closePath();
+          sceneCtx.fill();
+
+          const glow = sceneCtx.createRadialGradient(0, -h * 0.88, 0, 0, -h * 0.88, w * 2.8);
+          glow.addColorStop(0, `rgba(180, 222, 255, ${glowAlpha.toFixed(3)})`);
+          glow.addColorStop(1, "rgba(180, 222, 255, 0)");
+          sceneCtx.fillStyle = glow;
+          sceneCtx.beginPath();
+          sceneCtx.arc(0, -h * 0.88, w * 2.8, 0, Math.PI * 2);
+          sceneCtx.fill();
+
+          sceneCtx.restore();
+        }
+
+        sceneCtx.restore();
+      }
+
+      function getFlashlightTargetX(playerY) {
+        return sceneState.width * 0.5;
+      }
+
+      function drawPathRiseLight(timeSeconds, currentTime) {
+        const visibility = getWindowVisibility(currentTime, PATH_RISE_LIGHT_WINDOW, PATH_RISE_LIGHT_FADE);
+        if (!visibility) {
+          return;
+        }
+
+        const width = sceneState.width;
+        const height = sceneState.height;
+        const centerX = pathCenterAt();
+        const pathHalf = getPathWidth() / 2;
+        const beatPulse = clamp(getBpmPulseIntensity(currentTime), 0, 1);
+        const coreStrength = (0.08 + beatPulse * 0.11) * visibility;
+        const pulseStrength = (0.06 + beatPulse * 0.1) * visibility;
+        const baseTop = height * 0.57;
+        const baseBottom = height * 0.985;
+
+        const centerGlow = sceneCtx.createLinearGradient(centerX, baseTop, centerX, baseBottom);
+        centerGlow.addColorStop(0, `rgba(154, 208, 255, ${(coreStrength * 0.58).toFixed(3)})`);
+        centerGlow.addColorStop(0.45, `rgba(172, 218, 255, ${(coreStrength * 0.88).toFixed(3)})`);
+        centerGlow.addColorStop(1, `rgba(255, 244, 186, ${(coreStrength * 1.35).toFixed(3)})`);
+        sceneCtx.fillStyle = centerGlow;
+        sceneCtx.fillRect(centerX - pathHalf * 0.48, baseTop, pathHalf * 0.96, baseBottom - baseTop);
+
+        for (let i = 0; i < 4; i += 1) {
+          const travel = (timeSeconds * 0.68 + i * 0.21) % 1;
+          const y = baseBottom - travel * (baseBottom - baseTop);
+          const widen = 1 - travel;
+          const pulseW = pathHalf * (0.36 + widen * 0.95);
+          const pulseH = 9 + widen * 26;
+          const alpha = (pulseStrength * (0.52 + widen * 0.92)).toFixed(3);
+          const xDrift = Math.sin(timeSeconds * 2 + i * 1.4) * pathHalf * 0.12;
+          const pulseGlow = sceneCtx.createRadialGradient(
+            centerX + xDrift,
+            y,
+            pulseW * 0.14,
+            centerX + xDrift,
+            y,
+            pulseW
+          );
+          pulseGlow.addColorStop(0, `rgba(198, 232, 255, ${alpha})`);
+          pulseGlow.addColorStop(0.7, `rgba(152, 205, 255, ${(Number(alpha) * 0.56).toFixed(3)})`);
+          pulseGlow.addColorStop(1, "rgba(152, 205, 255, 0)");
+          sceneCtx.fillStyle = pulseGlow;
+          sceneCtx.beginPath();
+          sceneCtx.ellipse(centerX + xDrift, y, pulseW, pulseH, 0, 0, Math.PI * 2);
+          sceneCtx.fill();
+        }
+
+        const edgeAlpha = (0.05 + beatPulse * 0.06) * visibility;
+        sceneCtx.strokeStyle = `rgba(188, 225, 255, ${edgeAlpha.toFixed(3)})`;
+        sceneCtx.lineWidth = 1.4;
+        for (const side of [-1, 1]) {
+          const edgeX = centerX + side * pathHalf * 0.9;
+          sceneCtx.beginPath();
+          sceneCtx.moveTo(edgeX, baseBottom);
+          sceneCtx.quadraticCurveTo(
+            edgeX + Math.sin(timeSeconds * 1.7 + side) * pathHalf * 0.12,
+            height * 0.76,
+            edgeX + Math.sin(timeSeconds * 1.1 + side * 2.1) * pathHalf * 0.08,
+            baseTop
+          );
+          sceneCtx.stroke();
+        }
+      }
+
+      function drawFlashlightAndMan(timeSeconds, currentTime) {
+        const width = sceneState.width;
+        const height = sceneState.height;
+        const profile = sceneState.profile;
+        const playerX = width * 0.5;
+        const playerY = height * profile.playerYRatio;
+
+        // Iluminación adaptativa centrada
+        let targetX = getFlashlightTargetX(playerY);
+
+        sceneState.flashAimX += (targetX - sceneState.flashAimX) * 0.06;
+
+        const handShakeX = Math.sin(timeSeconds * 3.4) * width * 0.004;
+        const handShakeY = Math.cos(timeSeconds * 2.9) * height * 0.003;
+        const aimX = sceneState.flashAimX + handShakeX;
+        const aimY = playerY - height * profile.beamLengthRatio + handShakeY;
+        const endHalf = width * profile.beamEndHalfRatio;
+        const lightFactor = sceneState.lightIntensity;
+        const beatPulse = getBpmPulseIntensity(currentTime);
+        const darkness = clamp(profile.flashDarkness - lightFactor * 0.52 - beatPulse * 0.3, 0.1, 0.6);
+        const extraFlashlightsVisibility = getMultiWindowVisibility(
+          currentTime,
+          EXTRA_FLASHLIGHT_WINDOWS,
+          EXTRA_FLASHLIGHT_FADE
+        );
+        const isExtraFlashlightTime = extraFlashlightsVisibility > 0;
+        const extraPulse = getBpmPulseIntensity(currentTime);
+        const extraBeamStrength = clamp(
+          (0.26 + extraPulse * 0.22) * (0.55 + extraFlashlightsVisibility * 0.85),
+          0.2,
+          0.72
+        );
+        const extraBeamSpread = endHalf * 0.86;
+        const mapCenter = pathCenterAt();
+        const extraLights = [
+          {
+            originX: width * 0.2,
+            originY: -height * 0.2,
+            targetX: mapCenter - width * 0.15,
+            targetY: height * 0.75,
+            originHalf: 14,
+            spreadScale: 1.15
+          },
+          {
+            originX: width * 0.5,
+            originY: -height * 0.25,
+            targetX: mapCenter,
+            targetY: height * 0.8,
+            originHalf: 18,
+            spreadScale: 1.35
+          },
+          {
+            originX: width * 0.8,
+            originY: -height * 0.2,
+            targetX: mapCenter + width * 0.15,
+            targetY: height * 0.75,
+            originHalf: 14,
+            spreadScale: 1.18
+          }
+        ];
+
+        sceneCtx.fillStyle = `rgba(0, 0, 0, ${darkness.toFixed(3)})`;
+        sceneCtx.fillRect(0, 0, width, height);
+
+        sceneCtx.save();
+        sceneCtx.globalCompositeOperation = "screen";
+
+        if (isExtraFlashlightTime) {
+          for (let i = 0; i < extraLights.length; i++) {
+            const extra = extraLights[i];
+            // Movimiento de barrido como helicóptero: origen fijo, target moviéndose
+            const sweepX = Math.sin(timeSeconds * 0.8 + i * 1.5) * width * 0.35;
+            const sweepY = Math.cos(timeSeconds * 0.6 + i * 1.2) * height * 0.15;
+            const currentTargetX = mapCenter + sweepX;
+            const currentTargetY = height * 0.7 + sweepY;
+
+            const originHalf = extra.originHalf || 6;
+            const beamSpread = extraBeamSpread * (extra.spreadScale || 1);
+            const extraGlow = sceneCtx.createLinearGradient(extra.originX, extra.originY, currentTargetX, currentTargetY);
+            extraGlow.addColorStop(
+              0,
+              `rgba(190, 228, 255, ${((0.06 + extraBeamStrength * 0.16) * extraFlashlightsVisibility).toFixed(3)})`
+            );
+            extraGlow.addColorStop(
+              0.52,
+              `rgba(170, 216, 255, ${((0.04 + extraBeamStrength * 0.12) * extraFlashlightsVisibility).toFixed(3)})`
+            );
+            extraGlow.addColorStop(1, "rgba(130, 195, 255, 0)");
+            sceneCtx.fillStyle = extraGlow;
+            sceneCtx.beginPath();
+            sceneCtx.moveTo(extra.originX - originHalf * 0.85, extra.originY);
+            sceneCtx.lineTo(extra.originX + originHalf * 0.85, extra.originY);
+            sceneCtx.lineTo(currentTargetX + beamSpread * 0.84, currentTargetY);
+            sceneCtx.lineTo(currentTargetX - beamSpread * 0.84, currentTargetY);
+            sceneCtx.closePath();
+            sceneCtx.fill();
+
+            const extraSpotGlow = sceneCtx.createRadialGradient(
+              currentTargetX,
+              currentTargetY,
+              beamSpread * 0.18,
+              currentTargetX,
+              currentTargetY,
+              beamSpread * 1.05
+            );
+            extraSpotGlow.addColorStop(
+              0,
+              `rgba(198, 234, 255, ${((0.08 + extraBeamStrength * 0.2) * extraFlashlightsVisibility).toFixed(3)})`
+            );
+            extraSpotGlow.addColorStop(1, "rgba(198, 234, 255, 0)");
+            sceneCtx.fillStyle = extraSpotGlow;
+            sceneCtx.beginPath();
+            sceneCtx.arc(currentTargetX, currentTargetY, beamSpread * 1.05, 0, Math.PI * 2);
+            sceneCtx.fill();
+          }
+        }
+
+        const coneGlow = sceneCtx.createLinearGradient(playerX, playerY, aimX, aimY);
+        coneGlow.addColorStop(0, `rgba(255, 245, 186, ${(0.1 + lightFactor * 0.36).toFixed(3)})`);
+        coneGlow.addColorStop(0.55, `rgba(255, 232, 154, ${(0.06 + lightFactor * 0.29).toFixed(3)})`);
+        coneGlow.addColorStop(1, "rgba(255, 222, 134, 0)");
+        sceneCtx.fillStyle = coneGlow;
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(playerX - 8, playerY);
+        sceneCtx.lineTo(playerX + 8, playerY);
+        sceneCtx.lineTo(aimX + endHalf * 0.84, aimY);
+        sceneCtx.lineTo(aimX - endHalf * 0.84, aimY);
+        sceneCtx.closePath();
+        sceneCtx.fill();
+
+        const spotGlow = sceneCtx.createRadialGradient(aimX, aimY, endHalf * 0.12, aimX, aimY, endHalf * 1.1);
+        spotGlow.addColorStop(0, `rgba(255, 249, 210, ${(0.14 + lightFactor * 0.4).toFixed(3)})`);
+        spotGlow.addColorStop(0.4, `rgba(255, 238, 174, ${(0.06 + lightFactor * 0.32).toFixed(3)})`);
+        spotGlow.addColorStop(1, "rgba(255, 226, 142, 0)");
+        sceneCtx.fillStyle = spotGlow;
+        sceneCtx.beginPath();
+        sceneCtx.arc(aimX, aimY, endHalf * 1.1, 0, Math.PI * 2);
+        sceneCtx.fill();
+
+        const pulseHalo = sceneCtx.createRadialGradient(aimX, aimY, endHalf * 0.4, aimX, aimY, endHalf * 1.65);
+        pulseHalo.addColorStop(0, `rgba(255, 231, 146, ${(0.03 + lightFactor * 0.34).toFixed(3)})`);
+        pulseHalo.addColorStop(1, "rgba(255, 231, 146, 0)");
+        sceneCtx.fillStyle = pulseHalo;
+        sceneCtx.beginPath();
+        sceneCtx.arc(aimX, aimY, endHalf * 1.65, 0, Math.PI * 2);
+        sceneCtx.fill();
+
+        drawPathRiseLight(timeSeconds, currentTime);
+        sceneCtx.restore();
+
+        const walk = Math.sin(timeSeconds * 8.2);
+        const bodyY = playerY + walk * 1.3;
+
+        // personaje completamente negro, sin variación de iluminación
+        const charFill = "black";
+        const charStroke = "black";
+        const shadowAlpha = 0.42;
+
+        // sombra bajo los pies
+        sceneCtx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+        sceneCtx.beginPath();
+        sceneCtx.ellipse(playerX, bodyY + 16, 13, 6, 0, 0, Math.PI * 2);
+        sceneCtx.fill();
+
+        // piernas y brazos
+        sceneCtx.strokeStyle = charStroke;
+        sceneCtx.lineWidth = 3;
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(playerX - 3, bodyY + 7);
+        sceneCtx.lineTo(playerX - 5 + walk * 0.6, bodyY + 16);
+        sceneCtx.moveTo(playerX + 3, bodyY + 7);
+        sceneCtx.lineTo(playerX + 5 - walk * 0.6, bodyY + 16);
+        sceneCtx.stroke();
+
+        // cuerpo
+        sceneCtx.fillStyle = charFill;
+        sceneCtx.fillRect(playerX - 6, bodyY - 6, 12, 14);
+
+        // detalles de ropa (aún negro)
+        sceneCtx.strokeStyle = charStroke;
+        sceneCtx.lineWidth = 3;
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(playerX - 5, bodyY - 2);
+        sceneCtx.lineTo(playerX - 10, bodyY + 4);
+        sceneCtx.moveTo(playerX + 5, bodyY - 2);
+        sceneCtx.lineTo(playerX + 11, bodyY + 2);
+        sceneCtx.stroke();
+
+        // cabeza negra
+        sceneCtx.fillStyle = charFill;
+        sceneCtx.beginPath();
+        sceneCtx.arc(playerX, bodyY - 11, 5, 0, Math.PI * 2);
+        sceneCtx.fill();
+
+        // linterna permanece igual para brillos
+        const handBrightness = 233 + (22 * lightFactor);
+        sceneCtx.fillStyle = `rgba(${Math.round(handBrightness)}, ${Math.round(handBrightness - 7)}, ${Math.round(handBrightness - 100)}, ${0.92 + lightFactor * 0.1})`;
+        sceneCtx.beginPath();
+        sceneCtx.arc(playerX + 12, bodyY + 2, 2.1, 0, Math.PI * 2);
+        sceneCtx.fill();
+      }
+
+      function renderScene(timestamp) {
+        if (!sceneState.lastTime) {
+          sceneState.lastTime = timestamp;
+        }
+
+        const dt = Math.min((timestamp - sceneState.lastTime) / 1000, 0.05);
+        sceneState.lastTime = timestamp;
+
+        const timeSeconds = timestamp / 1000;
+        sceneState.scroll += dt * sceneState.profile.forwardSpeed;
+
+        // BPM pulse sections from timestamp ranges
+        const currentAudioTime = audio.currentTime || 0;
+        sceneState.lightIntensity = getFlashlightIntensity(currentAudioTime);
+        syncBlackOverlayForTime(currentAudioTime);
+
+        drawSky(timeSeconds);
+        drawGround();
+        drawPath(timeSeconds);
+        updateAndDrawTrees(dt, timeSeconds);
+        drawFlashlightAndMan(timeSeconds, currentAudioTime);
+        updateGhostClock(currentAudioTime);
+
+        requestAnimationFrame(renderScene);
+      }
+
+      window.addEventListener("resize", resizeScene);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", resizeScene);
+      }
+
+      resizeScene();
+      requestAnimationFrame(renderScene);
+
+      const audio = document.getElementById("audio");
+      const startBtn = document.getElementById("start-btn");
+      const lyricEl = document.getElementById("lyric");
+      const ghostClockEl = document.getElementById("ghost-clock");
+      const ghostClockHandEl = document.getElementById("ghost-clock-hand");
+      const statusText = document.getElementById("status");
+      const blackOverlayEl = document.getElementById("black-overlay");
+      const LRC_PATH = "media/somewhereonlyweknow.lrc";
+
+      let lyricWords = [];
+      let activeWordIndex = -1;
+      let rafId = null;
+      let firstTripleDotIndex = -1;
+      let lastTripleDotIndex = -1;
+      let firstTripleDotTime = null;
+      let lastTripleDotTime = null;
+
+
+      function parseTimestamp(min, sec, msRaw) {
+        const ms = Number((msRaw || "0").padEnd(3, "0"));
+        return Number(min) * 60 + Number(sec) + ms / 1000;
+      }
+
+      function cleanWord(text) {
+        return text.replace(/\s+/g, " ").replace(/\s+([,.;:!?])/g, "$1").trim();
+      }
+
+      function isTripleDotLyric(text) {
+        return typeof text === "string" && text.replace(/\s+/g, "") === "...";
+      }
+
+      function updateTripleDotMarkers() {
+        firstTripleDotIndex = -1;
+        lastTripleDotIndex = -1;
+        firstTripleDotTime = null;
+        lastTripleDotTime = null;
+
+        for (let index = 0; index < lyricWords.length; index += 1) {
+          if (!isTripleDotLyric(lyricWords[index].text)) {
+            continue;
+          }
+          if (firstTripleDotIndex < 0) {
+            firstTripleDotIndex = index;
+            firstTripleDotTime = lyricWords[index].time;
+          }
+          lastTripleDotIndex = index;
+          lastTripleDotTime = lyricWords[index].time;
+        }
+      }
+
+      function syncBlackOverlayForTime(currentTime) {
+        if (!blackOverlayEl) {
+          return;
+        }
+
+        const safeTime = Number.isFinite(currentTime) ? currentTime : 0;
+        
+        // Si no hay markers, fade out después de 0.4s
+        if (firstTripleDotTime === null) {
+          if (safeTime > 0.4) {
+            blackOverlayEl.classList.remove("slow-return");
+            blackOverlayEl.classList.add("fade-out");
+          } else {
+            blackOverlayEl.classList.remove("slow-return");
+            blackOverlayEl.classList.remove("fade-out");
+          }
+          return;
+        }
+
+        const fadeStart = Math.max(0, firstTripleDotTime - 0.5);
+        const fadeEnd = Math.max(0, lastTripleDotTime + 0.5);
+        const returnStart = lastTripleDotTime + 0.2;
+
+        // Después de los últimos "...": vuelve a negro lentamente
+        if (safeTime >= returnStart) {
+          blackOverlayEl.classList.add("slow-return");
+          blackOverlayEl.classList.remove("fade-out");
+          return;
+        }
+
+        // Entre primeros y últimos "...": transparente (escena visible)
+        if (safeTime >= fadeStart && safeTime < returnStart) {
+          blackOverlayEl.classList.remove("slow-return");
+          blackOverlayEl.classList.add("fade-out");
+          return;
+        }
+
+        // Estado base: negro (intro)
+        blackOverlayEl.classList.remove("slow-return");
+        blackOverlayEl.classList.remove("fade-out");
+      }
+
+
+      function parseLrc(rawText) {
+        const cleaned = rawText
+          .replace(/\r/g, "")
+          .replace(/\\\[/g, "[")
+          .replace(/\\\]/g, "]")
+          .replace(/\u00a0/g, " ");
+
+        const tokenPattern = /\[(\d{2}):(\d{2})(?:\.(\d{1,3}))?\]([^\[]*)/g;
+        const words = [];
+        let match = tokenPattern.exec(cleaned);
+
+        while (match) {
+          const text = cleanWord(match[4]);
+          if (text) {
+            words.push({
+              time: parseTimestamp(match[1], match[2], match[3]),
+              text
+            });
+          }
+          match = tokenPattern.exec(cleaned);
+        }
+
+        return words.sort((a, b) => a.time - b.time);
+      }
+
+      function setStatus(message, isError = false) {
+        statusText.textContent = message;
+        statusText.style.opacity = message ? "1" : "0";
+        statusText.style.color = isError ? "#ff6a6a" : "#d0d0d0";
+      }
+
+      function formatLrcTime(seconds) {
+        if (!Number.isFinite(seconds) || seconds < 0) {
+          return "00:00.00";
+        }
+
+        const totalCentiseconds = Math.floor(seconds * 100);
+        const mins = Math.floor(totalCentiseconds / 6000);
+        const secs = Math.floor((totalCentiseconds % 6000) / 100);
+        const centis = totalCentiseconds % 100;
+        return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}.${String(centis).padStart(2, "0")}`;
+      }
+
+      function parseDebugTimeValue(rawValue) {
+        const value = String(rawValue || "").trim();
+        if (!value) {
+          return null;
+        }
+
+        if (/^\d+(\.\d+)?$/.test(value)) {
+          return Number(value);
+        }
+
+        const match = value.match(/^(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?$/);
+        if (!match) {
+          return null;
+        }
+
+        return parseTimestamp(match[1], match[2], match[3] || "0");
+      }
+
+      function seekAudioTo(targetSeconds) {
+        if (!Number.isFinite(targetSeconds)) {
+          return;
+        }
+
+        const maxTime = Number.isFinite(audio.duration) ? audio.duration : Math.max(0, targetSeconds);
+        const safeTime = clamp(targetSeconds, 0, maxTime);
+        audio.currentTime = safeTime;
+        updateLyrics(safeTime, true);
+        updateSongTimer(safeTime);
+        updateGhostClock(safeTime);
+        syncBlackOverlayForTime(safeTime);
+      }
+
+      function seekAudioBy(deltaSeconds) {
+        seekAudioTo((audio.currentTime || 0) + deltaSeconds);
+      }
+
+      function initAudioDebugControls() {
+        // Debug controls quitados
+      }
+
+      function updateSongTimer(currentTime = audio.currentTime) {
+        // Temporizador quitado
+      }
+
+      function findWordIndex(currentTime) {
+        let low = 0;
+        let high = lyricWords.length - 1;
+        let result = -1;
+
+        while (low <= high) {
+          const mid = Math.floor((low + high) / 2);
+          if (lyricWords[mid].time <= currentTime) {
+            result = mid;
+            low = mid + 1;
+          } else {
+            high = mid - 1;
+          }
+        }
+
+        return result;
+      }
+
+      function updateLyrics(currentTime, force = false) {
+        if (!lyricWords.length) {
+          return;
+        }
+
+        const nextIndex = findWordIndex(currentTime);
+        if (!force && nextIndex === activeWordIndex) {
+          syncBlackOverlayForTime(currentTime);
+          return;
+        }
+
+        activeWordIndex = nextIndex;
+
+        if (nextIndex < 0) {
+          lyricEl.textContent = "";
+          syncBlackOverlayForTime(currentTime);
+          return;
+        }
+
+        const word = lyricWords[nextIndex].text;
+        lyricEl.textContent = isTripleDotLyric(word) ? "" : word;
+        syncBlackOverlayForTime(currentTime);
+      }
+
+      function stopSyncLoop() {
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+      }
+
+      function syncLoop() {
+        updateLyrics(audio.currentTime);
+        updateSongTimer(audio.currentTime);
+        rafId = requestAnimationFrame(syncLoop);
+      }
+
+      function startSyncLoop() {
+        if (rafId === null) {
+          rafId = requestAnimationFrame(syncLoop);
+        }
+      }
+
+      async function startSequenceFromBeginning() {
+        if (!lyricWords.length) {
+          return;
+        }
+
+        stopSyncLoop();
+        audio.currentTime = 0;
+        activeWordIndex = -1;
+        lyricEl.textContent = "";
+        syncBlackOverlayForTime(0);
+
+        updateLyrics(0, true);
+
+        try {
+          await audio.play();
+          startBtn.hidden = true;
+          setStatus("");
+          document.body.classList.add("sequence-started");
+        } catch (error) {
+          setStatus("No se pudo iniciar. Presiona de nuevo.", true);
+          console.error(error);
+        }
+      }
+
+      async function loadLyrics() {
+        try {
+          const response = await fetch(encodeURI(LRC_PATH));
+          if (!response.ok) {
+            throw new Error(`No se pudo cargar ${LRC_PATH}`);
+          }
+
+          const rawLrc = await response.text();
+          lyricWords = parseLrc(rawLrc);
+
+          if (!lyricWords.length) {
+            throw new Error("El archivo LRC no tiene timestamps validos.");
+          }
+
+          updateTripleDotMarkers();
+
+              startBtn.disabled = false;
+          setStatus(`Listo. ${lyricWords.length} lineas cargadas.`);
+        } catch (error) {
+          lyricEl.textContent = "Error";
+          startBtn.disabled = true;
+          setStatus("No se pudo cargar el LRC. Usa servidor local.", true);
+          console.error(error);
+        }
+      }
+
+      startBtn.addEventListener("click", async () => {
+        await startSequenceFromBeginning();
+      });
+
+      audio.addEventListener("play", () => {
+        startSyncLoop();
+      });
+
+      audio.addEventListener("pause", () => {
+        stopSyncLoop();
+      });
+
+      audio.addEventListener("ended", () => {
+        stopSyncLoop();
+        lyricEl.textContent = "";
+        setStatus("");
+      });
+
+      audio.addEventListener("timeupdate", () => {
+        updateLyrics(audio.currentTime);
+      });
+
+      audio.addEventListener("loadedmetadata", () => {
+        // Metadata loaded
+      });
+
+      initAudioDebugControls();
+      loadLyrics();
+    </script>
+  </body>
+</html>

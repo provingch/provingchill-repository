@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Valoraciones | ProvingChill</title>
+    <link rel="icon" type="image/png" href="{{ url_for('serve_media', filename='favicon.png') }}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Syne:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body
+    data-authenticated="{{ '1' if auth_user else '0' }}"
+    data-username="{{ auth_user.username if auth_user else '' }}"
+    data-role="{{ auth_user.role if auth_user else '' }}"
+    data-page="ratings"
+  >
+    <div class="bg-noise" aria-hidden="true"></div>
+    <div class="bg-shape bg-shape-a" aria-hidden="true"></div>
+    <div class="bg-shape bg-shape-b" aria-hidden="true"></div>
+    {% set flash_messages = get_flashed_messages(with_categories=true) %}
+    {% set auth_jump_href = '#ratings-board' %}
+    {% set auth_jump_label = 'Ir a valoraciones' %}
+    {% set auth_return_path = request.path %}
+    {% include "_site_nav.html" %}
+
+    <main class="wrapper chat-page-shell">
+      <h1 class="sr-only">Valoraciones</h1>
+      <section class="panel chat-panel chat-room-panel" id="ratings-board">
+        <div class="section-header chat-panel-head">
+          <div>
+            <p class="chat-kicker">Comunidad</p>
+            <h2>Valoraciones</h2>
+          </div>
+          {% if auth_user %}
+          <span class="chat-session">
+            <span class="avatar-shell avatar-shell-xs{% if auth_user.avatar_url %} has-image{% endif %}">
+              {% if auth_user.avatar_url %}
+              <img src="{{ auth_user.avatar_url }}" alt="Foto de {{ auth_user.username }}" />
+              {% else %}
+              <span>{{ auth_user.username[:1]|upper }}</span>
+              {% endif %}
+            </span>
+            {{ auth_user.username }}
+            <span class="role-pill {{ auth_user.role }}">{{ auth_user.role }}</span>
+          </span>
+          {% endif %}
+        </div>
+
+        {% if auth_user %}
+        <div class="chat-layout">
+          <div class="chat-main">
+            <div class="chat-main-top">
+              <div>
+                <p class="chat-room-label">Comentarios publicados</p>
+                <h3>Deja una opinion con estrellas y comentario</h3>
+              </div>
+              <span id="chat-live-badge" class="chat-live-badge">Cargando</span>
+            </div>
+
+            <div id="chat-status" class="status" aria-live="polite"></div>
+
+            <div class="chat-feed-frame">
+              <div id="chat-list" class="chat-list" aria-live="polite"></div>
+            </div>
+
+            <form id="chat-form" class="chat-form chat-form-surface">
+              <div class="chat-composer">
+                <div class="avatar-shell avatar-shell-sm{% if auth_user.avatar_url %} has-image{% endif %}">
+                  {% if auth_user.avatar_url %}
+                  <img src="{{ auth_user.avatar_url }}" alt="Foto de {{ auth_user.username }}" />
+                  {% else %}
+                  <span>{{ auth_user.username[:1]|upper }}</span>
+                  {% endif %}
+                </div>
+                <div class="rating-composer-panel">
+                  <fieldset class="rating-input-group">
+                    <legend>Tu valoracion</legend>
+                    <div class="rating-stars-picker" role="radiogroup" aria-label="Tu valoracion">
+                      {% for rating in range(5, 0, -1) %}
+                      <label class="rating-star-label" for="rating-{{ rating }}">
+                        <input
+                          id="rating-{{ rating }}"
+                          type="radio"
+                          name="rating"
+                          value="{{ rating }}"
+                          {% if rating == 5 %}checked{% endif %}
+                        />
+                        <span aria-hidden="true">{{ "★" * rating }}</span>
+                        <span class="sr-only">{{ rating }} estrellas</span>
+                      </label>
+                      {% endfor %}
+                    </div>
+                  </fieldset>
+                  <label class="field chat-field" for="chat-message">
+                    <span>Comentario</span>
+                    <textarea
+                      id="chat-message"
+                      name="message"
+                      rows="4"
+                      maxlength="420"
+                      placeholder="Escribe tu comentario..."
+                      required
+                    ></textarea>
+                  </label>
+                </div>
+              </div>
+              <div class="chat-form-footer chat-form-footer-inline">
+                <p id="rating-form-note" class="chat-compose-note">
+                  Maximo 420 caracteres por comentario.
+                </p>
+                <button type="submit" id="chat-submit">Publicar valoracion</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        {% else %}
+        <div class="chat-layout chat-layout-guest">
+          <div class="chat-main chat-main-guest">
+            <p class="chat-room-label">Acceso requerido</p>
+            <h3>Entra para dejar una valoracion</h3>
+            <div class="chat-locked">
+              <p class="chat-empty">
+                Crea una cuenta o inicia sesion para comentar y puntuar el portal con estrellas.
+              </p>
+              <a class="btn" href="#login">Entrar al acceso</a>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </section>
+    </main>
+
+    <script>
+      window.__APP_CONTEXT__ = {{ {"authenticated": auth_user is not none, "user": auth_user if auth_user else None, "timezone": app_timezone_name}|tojson }};
+    </script>
+    <script
+      src="https://cdn.socket.io/4.7.5/socket.io.min.js"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  </body>
+</html>

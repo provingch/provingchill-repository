@@ -1,0 +1,1934 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ferxxo 100 - Feid</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+      }
+
+      body {
+        font-family: sans-serif;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene-canvas"></canvas>
+
+    <script>
+      const WORLD = { width: 1600, height: 900 };
+      const DEFAULT_SCENE_DURATION = 163.59;
+      const ROOFTOP_MESSAGE_TYPE = "scene:set-time";
+      const ROOFTOP_CONFIG_MESSAGE_TYPE = "scene:set-config";
+      const PHONE_CALL_WINDOW = { start: 1.71, end: 6.36, feather: 0.26 };
+      const INTRO_FADE_DURATION = 0.92;
+      const FIGURE_SILHOUETTE_PATH = "../media/figure.png";
+      const CONSTELLATION_FG_LAYOUTS = [
+        {
+          points: [
+            { x: 214, y: 126, size: 2.5 },
+            { x: 262, y: 168, size: 2.2 },
+            { x: 326, y: 142, size: 2.7 },
+            { x: 378, y: 188, size: 2.1 },
+            { x: 424, y: 150, size: 2.4 },
+            { x: 358, y: 102, size: 2.1 }
+          ],
+          edges: [[0, 1], [1, 2], [2, 3], [3, 4], [2, 5], [5, 4]]
+        },
+        {
+          points: [
+            { x: 546, y: 122, size: 2.4 },
+            { x: 602, y: 168, size: 2.2 },
+            { x: 660, y: 138, size: 2.8 },
+            { x: 726, y: 176, size: 2.3 },
+            { x: 764, y: 126, size: 2.4 },
+            { x: 686, y: 94, size: 2.0 }
+          ],
+          edges: [[0, 1], [1, 2], [2, 3], [3, 4], [2, 5], [5, 4]]
+        },
+        {
+          points: [
+            { x: 896, y: 152, size: 2.4 },
+            { x: 954, y: 198, size: 2.1 },
+            { x: 1018, y: 166, size: 2.7 },
+            { x: 1082, y: 216, size: 2.2 },
+            { x: 1136, y: 184, size: 2.4 },
+            { x: 1046, y: 118, size: 2.0 }
+          ],
+          edges: [[0, 1], [1, 2], [2, 3], [3, 4], [2, 5], [5, 4]]
+        },
+        {
+          points: [
+            { x: 1218, y: 132, size: 2.3 },
+            { x: 1274, y: 180, size: 2.1 },
+            { x: 1330, y: 146, size: 2.6 },
+            { x: 1392, y: 192, size: 2.2 },
+            { x: 1452, y: 154, size: 2.4 },
+            { x: 1362, y: 104, size: 2.0 }
+          ],
+          edges: [[0, 1], [1, 2], [2, 3], [3, 4], [2, 5], [5, 4]]
+        }
+      ];
+      const CONSTELLATION_FI_LAYOUTS = [
+        {
+          points: [
+            { x: 150, y: 100, size: 2.3 },
+            { x: 220, y: 140, size: 2.1 },
+            { x: 280, y: 110, size: 2.6 },
+            { x: 340, y: 160, size: 2.0 },
+            { x: 380, y: 120, size: 2.4 },
+            { x: 310, y: 75, size: 1.9 }
+          ],
+          edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [1, 4]]
+        },
+        {
+          points: [
+            { x: 500, y: 95, size: 2.4 },
+            { x: 570, y: 145, size: 2.2 },
+            { x: 630, y: 115, size: 2.8 },
+            { x: 700, y: 155, size: 2.1 },
+            { x: 740, y: 100, size: 2.3 },
+            { x: 650, y: 60, size: 2.0 }
+          ],
+          edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [0, 3]]
+        },
+        {
+          points: [
+            { x: 880, y: 130, size: 2.3 },
+            { x: 940, y: 180, size: 2.0 },
+            { x: 1010, y: 150, size: 2.7 },
+            { x: 1070, y: 200, size: 2.2 },
+            { x: 1130, y: 160, size: 2.4 },
+            { x: 1040, y: 100, size: 1.9 }
+          ],
+          edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [2, 4]]
+        },
+        {
+          points: [
+            { x: 1250, y: 110, size: 2.2 },
+            { x: 1310, y: 160, size: 2.1 },
+            { x: 1370, y: 125, size: 2.6 },
+            { x: 1430, y: 175, size: 2.1 },
+            { x: 1480, y: 130, size: 2.3 },
+            { x: 1390, y: 80, size: 1.9 }
+          ],
+          edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [1, 4]]
+        }
+      ];
+      const FIGURE_SPRITES = {
+        idle: {
+          sx: 984,
+          sy: 49,
+          sw: 270,
+          sh: 819,
+          dx: -60,
+          dy: -206,
+          dw: 122,
+          dh: 370
+        },
+        phone: {
+          sx: 260,
+          sy: 49,
+          sw: 289,
+          sh: 816,
+          dx: -63,
+          dy: -204,
+          dw: 128,
+          dh: 362
+        }
+      };
+
+      const canvas = document.getElementById("scene-canvas");
+      const ctx = canvas ? canvas.getContext("2d") : null;
+      const queryParams = new URLSearchParams(window.location.search);
+      const embedded = queryParams.get("embedded") === "1";
+      const hasPreviewTime = queryParams.has("previewTime");
+      const previewTimeValue = Number(queryParams.get("previewTime"));
+      const durationValue = Number(queryParams.get("duration"));
+      const defaultPreviewTime = Number.isFinite(previewTimeValue) ? Math.max(0, previewTimeValue) : 12.2;
+
+      const state = {
+        width: 0,
+        height: 0,
+        dpr: 1,
+        currentTime: embedded ? 0 : defaultPreviewTime,
+        duration: Number.isFinite(durationValue) && durationValue > 0 ? durationValue : DEFAULT_SCENE_DURATION,
+        started: !embedded && hasPreviewTime,
+        ambientTime: 0,
+        lastFrameTime: 0,
+        frameId: null,
+        reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+        figureSpriteReady: false,
+        camera: {
+          x: 0,
+          y: 0,
+          zoom: 1.04
+        },
+        stars: [],
+        clouds: [],
+        farBuildings: [],
+        nearBuildings: [],
+        puddles: [],
+        vents: [],
+        parapetLights: [],
+        neonParticles: [],
+        effectTimeline: {
+          events: [],
+          windowBursts: [],
+          streetAuraWindows: [],
+          streetAuraFlashes: [],
+          beatWindows: [],
+          beatBursts: [],
+          constellationWindows: [],
+          constellationHighlights: [],
+          blackout: {
+            start: null,
+            fullAt: null
+          }
+        }
+      };
+      const figureSprite = new Image();
+      figureSprite.decoding = "async";
+      figureSprite.onload = () => {
+        state.figureSpriteReady = true;
+        drawScene();
+      };
+      figureSprite.onerror = () => {
+        state.figureSpriteReady = false;
+      };
+      figureSprite.src = encodeURI(FIGURE_SILHOUETTE_PATH);
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function saturate(value) {
+        return clamp(value, 0, 1);
+      }
+
+      function lerp(start, end, amount) {
+        return start + (end - start) * amount;
+      }
+
+      function hashUnit(seed) {
+        const value = Math.sin(seed * 12.9898) * 43758.5453123;
+        return value - Math.floor(value);
+      }
+
+      function smoothstep(value) {
+        const x = saturate(value);
+        return x * x * (3 - 2 * x);
+      }
+
+      function createRng(seed) {
+        let value = seed >>> 0;
+        return function random() {
+          value += 0x6d2b79f5;
+          let t = value;
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function randomRange(rng, min, max) {
+        return min + (max - min) * rng();
+      }
+
+      function windowedMix(currentTime, start, end, feather) {
+        if (currentTime <= start - feather || currentTime >= end + feather) {
+          return 0;
+        }
+
+        if (currentTime < start) {
+          return smoothstep((currentTime - (start - feather)) / feather);
+        }
+
+        if (currentTime > end) {
+          return 1 - smoothstep((currentTime - end) / feather);
+        }
+
+        return 1;
+      }
+
+      function getSceneProgress(currentTime) {
+        return smoothstep(clamp(currentTime / Math.max(state.duration, 1), 0, 1));
+      }
+
+      function getPhoneCallMix(currentTime) {
+        return windowedMix(currentTime, PHONE_CALL_WINDOW.start, PHONE_CALL_WINDOW.end, PHONE_CALL_WINDOW.feather);
+      }
+
+      function parseEffectCode(text) {
+        const match = /\(([A-Z]+)\)/i.exec(String(text || ""));
+        return match ? match[1].toUpperCase() : "";
+      }
+
+      function buildEffectTimeline(entries, duration = DEFAULT_SCENE_DURATION) {
+        const timeline = {
+          events: [],
+          windowBursts: [],
+          streetAuraWindows: [],
+          streetAuraFlashes: [],
+          beatWindows: [],
+          beatBursts: [],
+          constellationWindows: [],
+          constellationHighlights: [],
+          blackout: {
+            start: null,
+            fullAt: null
+          }
+        };
+        const normalized = Array.isArray(entries)
+          ? entries
+              .map((entry) => ({
+                time: Number(entry.time),
+                code: String(entry.code || parseEffectCode(entry.text || "")).toUpperCase()
+              }))
+              .filter((entry) => Number.isFinite(entry.time) && entry.time >= 0 && entry.code)
+              .sort((a, b) => a.time - b.time)
+          : [];
+        const finalTime = normalized.length ? Math.max(duration, normalized[normalized.length - 1].time) : duration;
+        let streetAuraStart = null;
+        let beatClusterStart = null;
+        let constellationStart = null;
+        let highlightIndex = 0;
+
+        timeline.events = normalized.map((entry) => ({
+          time: entry.time,
+          code: entry.code,
+          text: `(${entry.code})`
+        }));
+
+        normalized.forEach((entry) => {
+          switch (entry.code) {
+            case "EL":
+              timeline.windowBursts.push(entry.time);
+              break;
+            case "NLF":
+              streetAuraStart = entry.time;
+              break;
+            case "DNLF":
+              timeline.streetAuraFlashes.push(entry.time);
+              break;
+            case "ENLF":
+              if (streetAuraStart !== null) {
+                timeline.streetAuraWindows.push({
+                  start: streetAuraStart,
+                  end: Math.max(entry.time, streetAuraStart + 0.18)
+                });
+                streetAuraStart = null;
+              }
+              break;
+            case "BC":
+              timeline.beatBursts.push(entry.time);
+              if (beatClusterStart === null) {
+                beatClusterStart = entry.time;
+              }
+              break;
+            case "CBC":
+              if (beatClusterStart !== null) {
+                timeline.beatWindows.push({
+                  start: beatClusterStart,
+                  end: Math.max(entry.time, beatClusterStart + 0.12)
+                });
+                beatClusterStart = null;
+              }
+              break;
+            case "FG":
+              if (constellationStart !== null) {
+                timeline.constellationWindows.push({
+                  start: constellationStart,
+                  end: Math.max(entry.time, constellationStart + 0.12)
+                });
+              }
+              constellationStart = entry.time;
+              break;
+            case "FI":
+              timeline.constellationHighlights.push({
+                time: entry.time,
+                index: highlightIndex % CONSTELLATION_FI_LAYOUTS.length,
+                type: "FI"
+              });
+              highlightIndex += 1;
+              break;
+            case "NE":
+              if (constellationStart !== null) {
+                timeline.constellationWindows.push({
+                  start: constellationStart,
+                  end: Math.max(entry.time, constellationStart + 0.12)
+                });
+                constellationStart = null;
+              }
+              break;
+            case "IBOF":
+              timeline.blackout.start = entry.time;
+              if (constellationStart !== null) {
+                timeline.constellationWindows.push({
+                  start: constellationStart,
+                  end: entry.time
+                });
+                constellationStart = null;
+              }
+              if (beatClusterStart !== null) {
+                timeline.beatWindows.push({
+                  start: beatClusterStart,
+                  end: entry.time
+                });
+                beatClusterStart = null;
+              }
+              if (streetAuraStart !== null) {
+                timeline.streetAuraWindows.push({
+                  start: streetAuraStart,
+                  end: entry.time
+                });
+                streetAuraStart = null;
+              }
+              break;
+            case "FBOF":
+              timeline.blackout.fullAt = entry.time;
+              break;
+            default:
+              break;
+          }
+        });
+
+        if (streetAuraStart !== null) {
+          timeline.streetAuraWindows.push({
+            start: streetAuraStart,
+            end: finalTime
+          });
+        }
+
+        if (beatClusterStart !== null) {
+          timeline.beatWindows.push({
+            start: beatClusterStart,
+            end: timeline.blackout.start !== null ? timeline.blackout.start : finalTime
+          });
+        }
+
+        if (constellationStart !== null) {
+          timeline.constellationWindows.push({
+            start: constellationStart,
+            end: timeline.blackout.start !== null ? timeline.blackout.start : finalTime
+          });
+        }
+
+        if (timeline.blackout.start !== null && timeline.blackout.fullAt === null) {
+          timeline.blackout.fullAt = finalTime;
+        }
+
+        return timeline;
+      }
+
+      function getEventPulse(currentTime, times, duration) {
+        let strength = 0;
+
+        times.forEach((time) => {
+          const elapsed = currentTime - time;
+          if (elapsed < 0 || elapsed > duration) {
+            return;
+          }
+
+          const tail = Math.pow(1 - elapsed / duration, 0.72);
+          strength = Math.max(strength, smoothstep(tail));
+        });
+
+        return strength;
+      }
+
+      function getActiveEventIndex(currentTime, times, duration) {
+        let activeIndex = -1;
+        let activeTime = -1;
+
+        times.forEach((time, index) => {
+          const elapsed = currentTime - time;
+          if (elapsed < 0 || elapsed > duration) {
+            return;
+          }
+
+          if (time >= activeTime) {
+            activeTime = time;
+            activeIndex = index;
+          }
+        });
+
+        return activeIndex;
+      }
+
+      function getRangePresence(currentTime, ranges, feather) {
+        let presence = 0;
+
+        ranges.forEach((range) => {
+          presence = Math.max(presence, windowedMix(currentTime, range.start, range.end, feather));
+        });
+
+        return presence;
+      }
+
+      function getConstellationHighlight(currentTime, highlights) {
+        for (let index = highlights.length - 1; index >= 0; index -= 1) {
+          const highlight = highlights[index];
+          const elapsed = currentTime - highlight.time;
+          if (elapsed < 0 || elapsed > 1.12) {
+            continue;
+          }
+
+          return {
+            index: highlight.index,
+            mix: smoothstep(Math.pow(1 - elapsed / 1.12, 0.72))
+          };
+        }
+
+        return { index: -1, mix: 0 };
+      }
+
+      function getFinalBlackout(currentTime, blackout) {
+        if (!blackout || blackout.start === null) {
+          return 0;
+        }
+
+        if (currentTime <= blackout.start) {
+          return 0;
+        }
+
+        if (blackout.fullAt === null || blackout.fullAt <= blackout.start) {
+          return 1;
+        }
+
+        return smoothstep((currentTime - blackout.start) / (blackout.fullAt - blackout.start));
+      }
+
+      function getEffectState(currentTime) {
+        const timeline = state.effectTimeline;
+        const auraBase = getRangePresence(currentTime, timeline.streetAuraWindows, 0.34);
+        const auraFlash = getEventPulse(currentTime, timeline.streetAuraFlashes, 1.2);
+        const beatSection = getRangePresence(currentTime, timeline.beatWindows, 0.16);
+        const beatPulse = getEventPulse(currentTime, timeline.beatBursts, 0.8);
+        const activeBeatIndex = getActiveEventIndex(currentTime, timeline.beatBursts, 0.8);
+        const windowPulse = getEventPulse(currentTime, timeline.windowBursts, 1.8);
+        const constellationMix = getRangePresence(currentTime, timeline.constellationWindows, 0.22);
+        const highlight = getConstellationHighlight(currentTime, timeline.constellationHighlights);
+        const neonMix = saturate(
+          windowPulse * 0.36 +
+          auraBase * 0.84 +
+          auraFlash * 0.58 +
+          beatSection * 0.72 +
+          beatPulse * 0.68 +
+          constellationMix * 0.32
+        );
+        const pulseFlash = saturate(
+          windowPulse * 0.28 +
+          auraFlash * 0.94 +
+          beatPulse +
+          highlight.mix * 0.26
+        );
+
+        return {
+          auraBase,
+          auraFlash,
+          beatSection,
+          beatPulse,
+          activeBeatIndex,
+          windowPulse,
+          windowGlowMix: saturate(windowPulse * 0.94 + auraBase * 0.44 + beatSection * 0.26 + beatPulse * 0.34),
+          starNeonMix: saturate(auraBase * 0.12),
+          constellationMix,
+          highlight,
+          finalBlackout: getFinalBlackout(currentTime, timeline.blackout),
+          neonMix,
+          pulseFlash
+        };
+      }
+
+      function getIntroBlackout(currentTime) {
+        if (!state.started) {
+          return 1;
+        }
+
+        return Math.max(0, 1 - smoothstep(currentTime / INTRO_FADE_DURATION));
+      }
+
+      function getPortraitMix() {
+        const aspectRatio = state.width / Math.max(state.height, 1);
+        return smoothstep((0.98 - aspectRatio) / 0.46);
+      }
+
+      function createBuildingLayer(rng, config) {
+        const buildings = [];
+        let cursor = config.startX;
+
+        while (cursor < WORLD.width + config.exitPadding) {
+          const width = randomRange(rng, config.width[0], config.width[1]);
+          const height = randomRange(rng, config.height[0], config.height[1]);
+          const inset = randomRange(rng, 10, 18);
+          const windows = [];
+          const roofBits = [];
+          const columnCount = Math.max(2, Math.floor((width - inset * 2) / config.windowStepX));
+          const rowCount = Math.max(4, Math.floor((height - 34) / config.windowStepY));
+
+          for (let row = 0; row < rowCount; row += 1) {
+            for (let col = 0; col < columnCount; col += 1) {
+              if (rng() > config.density) {
+                continue;
+              }
+
+              windows.push({
+                x: inset + col * config.windowStepX,
+                y: 18 + row * config.windowStepY,
+                width: randomRange(rng, config.windowSize[0], config.windowSize[1]),
+                height: randomRange(rng, config.windowSize[2], config.windowSize[3]),
+                alpha: randomRange(rng, 0.2, 0.68),
+                pulse: randomRange(rng, 0.45, 1.35),
+                phase: randomRange(rng, 0, Math.PI * 2),
+                warmMix: rng(),
+                neonBias: rng() > 0.45 ? randomRange(rng, 0.24, 1) : 0
+              });
+            }
+          }
+
+          const mastCount = rng() > 0.62 ? 1 : 0;
+          for (let index = 0; index < mastCount; index += 1) {
+            roofBits.push({
+              x: randomRange(rng, 18, width - 18),
+              height: randomRange(rng, 18, 54),
+              blink: rng() > 0.5,
+              phase: randomRange(rng, 0, Math.PI * 2)
+            });
+          }
+
+          buildings.push({
+            x: cursor,
+            width,
+            height,
+            windows,
+            roofBits,
+            accentWidth: randomRange(rng, 8, 22),
+            neonStripe: rng() > 0.58 ? randomRange(rng, 0.2, 0.9) : 0
+          });
+
+          cursor += width + randomRange(rng, config.gap[0], config.gap[1]);
+        }
+
+        return buildings;
+      }
+
+      function seedScene() {
+        const rng = createRng(506261005);
+
+        state.stars = [];
+        state.clouds = [];
+        state.farBuildings = [];
+        state.nearBuildings = [];
+        state.puddles = [];
+        state.vents = [];
+        state.parapetLights = [];
+        state.neonParticles = [];
+
+        for (let index = 0; index < 116; index += 1) {
+          state.stars.push({
+            x: randomRange(rng, 0.02, 0.98),
+            y: randomRange(rng, 0.04, 0.56),
+            size: randomRange(rng, 0.6, 2.1),
+            alpha: randomRange(rng, 0.24, 0.76),
+            pulse: randomRange(rng, 0.6, 1.8),
+            phase: randomRange(rng, 0, Math.PI * 2),
+            beatSeed: randomRange(rng, 0, 2000)
+          });
+        }
+
+        for (let index = 0; index < 7; index += 1) {
+          state.clouds.push({
+            x: randomRange(rng, -260, WORLD.width + 220),
+            y: randomRange(rng, 118, 298),
+            width: randomRange(rng, 180, 340),
+            height: randomRange(rng, 42, 78),
+            speed: randomRange(rng, 3, 8),
+            alpha: randomRange(rng, 0.035, 0.085),
+            phase: randomRange(rng, 0, Math.PI * 2)
+          });
+        }
+
+        state.farBuildings = createBuildingLayer(rng, {
+          startX: -180,
+          exitPadding: 220,
+          width: [84, 176],
+          height: [112, 238],
+          gap: [10, 36],
+          density: 0.56,
+          windowStepX: 18,
+          windowStepY: 20,
+          windowSize: [5, 9, 8, 14]
+        });
+
+        state.nearBuildings = createBuildingLayer(rng, {
+          startX: -140,
+          exitPadding: 180,
+          width: [108, 228],
+          height: [182, 358],
+          gap: [12, 28],
+          density: 0.64,
+          windowStepX: 20,
+          windowStepY: 24,
+          windowSize: [6, 10, 10, 16]
+        });
+
+        for (let index = 0; index < 4; index += 1) {
+          state.puddles.push({
+            x: randomRange(rng, 160, WORLD.width - 320),
+            y: randomRange(rng, 700, 812),
+            radiusX: randomRange(rng, 48, 120),
+            radiusY: randomRange(rng, 12, 28),
+            alpha: randomRange(rng, 0.06, 0.14)
+          });
+        }
+
+        const ventX = [300, 810, 1310];
+        ventX.forEach((x) => {
+          state.vents.push({
+            x,
+            y: x > 1200 ? 608 : 620,
+            width: x > 1200 ? 132 : 112,
+            height: x > 1200 ? 62 : 56,
+            fanPhase: randomRange(rng, 0, Math.PI * 2),
+            ledPhase: randomRange(rng, 0, Math.PI * 2)
+          });
+        });
+
+        for (let index = 0; index < 26; index += 1) {
+          state.parapetLights.push({
+            x: randomRange(rng, 72, WORLD.width - 72),
+            y: randomRange(rng, 508, 586),
+            size: randomRange(rng, 1.2, 3.5),
+            alpha: randomRange(rng, 0.08, 0.22),
+            pulse: randomRange(rng, 0.4, 1.3),
+            phase: randomRange(rng, 0, Math.PI * 2),
+            neonBias: randomRange(rng, 0.25, 1)
+          });
+        }
+
+        for (let index = 0; index < 54; index += 1) {
+          state.neonParticles.push({
+            x: randomRange(rng, 70, WORLD.width - 70),
+            y: randomRange(rng, 386, 780),
+            size: randomRange(rng, 1.4, 4.6),
+            alpha: randomRange(rng, 0.1, 0.24),
+            pulse: randomRange(rng, 0.5, 1.4),
+            phase: randomRange(rng, 0, Math.PI * 2),
+            driftX: randomRange(rng, 4, 22),
+            driftY: randomRange(rng, 3, 18),
+            depth: rng(),
+            hueShift: randomRange(rng, -8, 10)
+          });
+        }
+      }
+
+      function resize() {
+        if (!canvas || !ctx) {
+          return;
+        }
+
+        state.width = Math.max(window.innerWidth, 1);
+        state.height = Math.max(window.innerHeight, 1);
+        state.dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        canvas.width = Math.round(state.width * state.dpr);
+        canvas.height = Math.round(state.height * state.dpr);
+        canvas.style.width = `${state.width}px`;
+        canvas.style.height = `${state.height}px`;
+
+        drawScene();
+      }
+
+      function getCameraPose(currentTime) {
+        const portraitMix = getPortraitMix();
+        const progress = getSceneProgress(currentTime);
+        const driftX = state.reducedMotion ? 0 : Math.sin(state.ambientTime * 0.18) * 10;
+        const driftY = state.reducedMotion ? 0 : Math.cos(state.ambientTime * 0.14) * 6;
+
+        return {
+          x: lerp(lerp(-50, -86, portraitMix), lerp(4, -14, portraitMix), progress) + driftX * 0.28,
+          y: lerp(lerp(10, -10, portraitMix), lerp(18, -24, portraitMix), progress) + driftY * 0.26,
+          zoom: lerp(lerp(1.05, 1.09, portraitMix), lerp(1.11, 1.18, portraitMix), progress)
+        };
+      }
+
+      function beginWorldTransform() {
+        const coverScale = Math.max(state.width / WORLD.width, state.height / WORLD.height);
+        const containScale = Math.min(state.width / WORLD.width, state.height / WORLD.height);
+        const portraitMix = getPortraitMix();
+        const baseScale = lerp(coverScale, containScale, portraitMix * 0.12);
+
+        ctx.save();
+        ctx.translate(state.width / 2, state.height / 2);
+        ctx.scale(baseScale, baseScale);
+        ctx.translate(
+          -WORLD.width / 2,
+          -WORLD.height / 2
+        );
+      }
+
+      function endWorldTransform() {
+        ctx.restore();
+      }
+
+      function drawBackground(neonMix) {
+        const sky = ctx.createLinearGradient(0, 0, 0, state.height);
+        sky.addColorStop(0, "#010205");
+        sky.addColorStop(0.36, "#050b15");
+        sky.addColorStop(0.7, "#071019");
+        sky.addColorStop(1, "#03060b");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, state.width, state.height);
+
+        const moonAura = ctx.createRadialGradient(
+          state.width * 0.73,
+          state.height * 0.18,
+          state.width * 0.03,
+          state.width * 0.73,
+          state.height * 0.18,
+          state.width * 0.3
+        );
+        moonAura.addColorStop(0, "rgba(162, 180, 220, 0.12)");
+        moonAura.addColorStop(0.4, "rgba(60, 82, 124, 0.08)");
+        moonAura.addColorStop(1, "rgba(0, 0, 0, 0)");
+        ctx.fillStyle = moonAura;
+        ctx.fillRect(0, 0, state.width, state.height);
+
+        const horizonGlow = ctx.createLinearGradient(0, state.height * 0.5, 0, state.height);
+        horizonGlow.addColorStop(0, "rgba(20, 46, 72, 0)");
+        horizonGlow.addColorStop(0.56, "rgba(14, 35, 58, 0.12)");
+        horizonGlow.addColorStop(1, "rgba(3, 7, 12, 0.68)");
+        ctx.fillStyle = horizonGlow;
+        ctx.fillRect(0, state.height * 0.42, state.width, state.height * 0.58);
+
+        if (neonMix > 0.01) {
+          const neonHaze = ctx.createLinearGradient(0, state.height * 0.48, 0, state.height);
+          neonHaze.addColorStop(0, "rgba(126, 255, 76, 0)");
+          neonHaze.addColorStop(0.72, `rgba(126, 255, 76, ${(0.03 * neonMix).toFixed(3)})`);
+          neonHaze.addColorStop(1, `rgba(126, 255, 76, ${(0.08 * neonMix).toFixed(3)})`);
+          ctx.fillStyle = neonHaze;
+          ctx.fillRect(0, state.height * 0.4, state.width, state.height * 0.6);
+        }
+      }
+
+      function drawMoon(neonMix, pulseFlash) {
+        const moonX = 1186;
+        const moonY = 170 + (state.reducedMotion ? 0 : Math.sin(state.ambientTime * 0.18) * 3);
+        const haloStrength = 0.55 + neonMix * 0.05 + pulseFlash * 0.08;
+
+        const glow = ctx.createRadialGradient(moonX, moonY, 30, moonX, moonY, 166);
+        glow.addColorStop(0, `rgba(235, 241, 255, ${haloStrength.toFixed(3)})`);
+        glow.addColorStop(0.18, "rgba(205, 220, 250, 0.22)");
+        glow.addColorStop(1, "rgba(205, 220, 250, 0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(moonX - 180, moonY - 180, 360, 360);
+
+        ctx.fillStyle = "#eef2fb";
+        ctx.beginPath();
+        ctx.arc(moonX, moonY, 30, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(114, 132, 166, 0.18)";
+        ctx.beginPath();
+        ctx.arc(moonX - 10, moonY - 7, 7, 0, Math.PI * 2);
+        ctx.arc(moonX + 8, moonY + 10, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#08111c";
+        ctx.beginPath();
+        ctx.arc(moonX + 15, moonY - 2, 28, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function drawStars(starNeonMix = 0, beatPulse = 0, constellationMix = 0, activeBeatIndex = -1) {
+        state.stars.forEach((star) => {
+          const twinkle = star.alpha * (0.7 + 0.3 * Math.sin(state.ambientTime * star.pulse + star.phase));
+          const beatSelection = activeBeatIndex >= 0
+            ? hashUnit((activeBeatIndex + 1) * 37.1 + star.beatSeed)
+            : 0;
+          const beatMix = beatSelection > 0.79 ? beatPulse * (0.78 + star.alpha * 0.28) : 0;
+          const greenMix = saturate(starNeonMix * (0.5 + star.alpha * 0.16) + beatMix);
+          const radius = star.size * (1 + greenMix * 0.72 + beatMix * 0.36);
+          const red = Math.round(lerp(238, 138, greenMix));
+          const green = Math.round(lerp(244, 255, greenMix));
+          const blue = Math.round(lerp(255, 98, greenMix));
+
+          if (greenMix > 0.02) {
+            ctx.fillStyle = `rgba(126, 255, 76, ${(greenMix * 0.12 + beatMix * 0.14).toFixed(3)})`;
+            ctx.beginPath();
+            ctx.arc(star.x * WORLD.width, star.y * WORLD.height, radius * 2.2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, ${twinkle.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(star.x * WORLD.width, star.y * WORLD.height, radius, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      function drawClouds() {
+        state.clouds.forEach((cloud) => {
+          const drift = state.reducedMotion ? 0 : state.ambientTime * cloud.speed;
+          const x = ((cloud.x + drift + WORLD.width + cloud.width) % (WORLD.width + cloud.width * 2)) - cloud.width;
+          const y = cloud.y + Math.sin(state.ambientTime * 0.08 + cloud.phase) * 6;
+
+          ctx.save();
+          ctx.globalAlpha = cloud.alpha;
+          ctx.fillStyle = "#d1dcf8";
+
+          [
+            [0, 0, 1, 1],
+            [cloud.width * 0.18, -8, 0.86, 0.9],
+            [cloud.width * 0.38, 6, 0.72, 0.76],
+            [cloud.width * 0.6, -3, 0.52, 0.7]
+          ].forEach(([offsetX, offsetY, scaleX, scaleY]) => {
+            ctx.beginPath();
+            ctx.ellipse(
+              x + offsetX,
+              y + offsetY,
+              cloud.width * 0.32 * scaleX,
+              cloud.height * 0.5 * scaleY,
+              0,
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+          });
+
+          ctx.restore();
+        });
+      }
+
+      function drawConstellations(constellationMix, highlight) {
+        if (constellationMix <= 0.01 && highlight.mix <= 0.01) {
+          return;
+        }
+
+        const layouts = highlight.type === "FI" ? CONSTELLATION_FI_LAYOUTS : CONSTELLATION_FG_LAYOUTS;
+        
+        layouts.forEach((constellation, index) => {
+          const highlightMix = highlight.index === index ? highlight.mix : 0;
+          const lineAlpha = constellationMix * 0.44 + highlightMix * 0.72;
+          const pointAlpha = constellationMix * 0.68 + highlightMix * 0.82;
+          const lineWidth = 1.4 + constellationMix * 0.8 + highlightMix * 1.2;
+
+          if (lineAlpha > 0.01) {
+            ctx.save();
+            ctx.strokeStyle = `rgba(126, 255, 76, ${lineAlpha.toFixed(3)})`;
+            ctx.shadowColor = `rgba(126, 255, 76, ${(lineAlpha * 0.84).toFixed(3)})`;
+            ctx.shadowBlur = 22 + constellationMix * 14 + highlightMix * 20;
+            ctx.lineWidth = lineWidth;
+            ctx.beginPath();
+
+            constellation.edges.forEach(([fromIndex, toIndex]) => {
+              const from = constellation.points[fromIndex];
+              const to = constellation.points[toIndex];
+              ctx.moveTo(from.x, from.y);
+              ctx.lineTo(to.x, to.y);
+            });
+
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          constellation.points.forEach((point) => {
+            const pulse = 0.7 + 0.3 * Math.sin(state.ambientTime * 1.6 + point.x * 0.01 + point.y * 0.02);
+            const glowRadius = point.size * (3.2 + constellationMix * 1.1 + highlightMix * 1.2);
+            const glowAlpha = pointAlpha * (0.48 + pulse * 0.3);
+
+            ctx.fillStyle = `rgba(126, 255, 76, ${glowAlpha.toFixed(3)})`;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, glowRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = `rgba(208, 255, 184, ${(pointAlpha * (0.8 + pulse * 0.12)).toFixed(3)})`;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, point.size + constellationMix * 0.45 + highlightMix * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        });
+      }
+
+      function drawCityLayer(buildings, baseY, palette, neonMix, pulseFlash) {
+        buildings.forEach((building, index) => {
+          const left = building.x;
+          const top = baseY - building.height;
+          const right = left + building.width;
+          const accentWidth = Math.min(building.accentWidth, building.width * 0.3);
+
+          const body = ctx.createLinearGradient(left, top, left, baseY);
+          body.addColorStop(0, palette.top);
+          body.addColorStop(1, palette.bottom);
+          ctx.fillStyle = body;
+          ctx.fillRect(left, top, building.width, building.height);
+
+          ctx.fillStyle = palette.side;
+          ctx.fillRect(right - accentWidth, top, accentWidth, building.height);
+
+          ctx.fillStyle = palette.cap;
+          ctx.fillRect(left, top, building.width, 10);
+
+          ctx.strokeStyle = palette.line;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(left + 5, baseY);
+          ctx.lineTo(left + 5, top);
+          ctx.moveTo(right - accentWidth - 6, baseY);
+          ctx.lineTo(right - accentWidth - 6, top);
+          ctx.stroke();
+
+          if (building.neonStripe > 0 && neonMix > 0.01) {
+            const stripeAlpha = (0.03 + building.neonStripe * neonMix * 0.1 + pulseFlash * 0.12 * building.neonStripe).toFixed(3);
+            ctx.fillStyle = `rgba(126, 255, 76, ${stripeAlpha})`;
+            ctx.fillRect(left + 6, top + 8, 6, building.height - 16);
+          }
+
+          building.windows.forEach((windowLight) => {
+            const pulse = 0.54 + 0.4 * Math.sin(state.ambientTime * windowLight.pulse + windowLight.phase);
+            const baseGlow = 0.16 + windowLight.neonBias * 0.26;
+            const neonStrength = saturate(baseGlow + neonMix * (0.46 + windowLight.neonBias * 0.58));
+            const flashBoost = 1 + pulseFlash * (0.7 + windowLight.neonBias * 2.4);
+            const red = Math.round(lerp(126, 144, neonStrength * 0.45));
+            const green = Math.round(lerp(184, 255, neonStrength));
+            const blue = Math.round(lerp(88, 96, 1 - neonStrength * 0.7));
+            const alpha = windowLight.alpha * (0.34 + pulse * 0.66) * (palette.windowStrength + neonStrength * 0.88) * flashBoost;
+
+            if (neonStrength > 0.08) {
+              ctx.fillStyle = `rgba(126, 255, 76, ${(alpha * 0.22).toFixed(3)})`;
+              ctx.fillRect(
+                left + windowLight.x - 1,
+                top + windowLight.y - 1,
+                windowLight.width + 2,
+                windowLight.height + 2
+              );
+            }
+
+            ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, ${alpha.toFixed(3)})`;
+            ctx.fillRect(
+              left + windowLight.x,
+              top + windowLight.y,
+              windowLight.width,
+              windowLight.height
+            );
+          });
+
+          building.roofBits.forEach((roofBit) => {
+            ctx.strokeStyle = palette.roof;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(left + roofBit.x, top);
+            ctx.lineTo(left + roofBit.x, top - roofBit.height);
+            ctx.stroke();
+
+            if (roofBit.blink) {
+              const blink = 0.35 + 0.65 * smoothstep((Math.sin(state.ambientTime * 2.3 + roofBit.phase) + 1) * 0.5);
+              const r = Math.round(lerp(128, 146, neonMix * 0.4));
+              const g = Math.round(lerp(176, 255, neonMix));
+              const b = Math.round(lerp(92, 86, neonMix * 0.6));
+              const a = 0.08 + blink * (0.22 + neonMix * 0.26 + pulseFlash * 0.3);
+              ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a.toFixed(3)})`;
+              ctx.beginPath();
+              ctx.arc(left + roofBit.x, top - roofBit.height, 2.8, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          });
+
+          if (index % 3 === 0) {
+            const haze = ctx.createLinearGradient(left, top, left, baseY);
+            haze.addColorStop(0, "rgba(255, 255, 255, 0.018)");
+            haze.addColorStop(1, "rgba(255, 255, 255, 0)");
+            ctx.fillStyle = haze;
+            ctx.fillRect(left, top, building.width, building.height);
+          }
+        });
+      }
+
+      function drawStreetAura(auraBase, auraFlash, beatPulse) {
+        const mix = saturate(auraBase + auraFlash * 0.8 + beatPulse * 0.16);
+        if (mix <= 0.01) {
+          return;
+        }
+
+        const core = ctx.createRadialGradient(810, 706, 26, 810, 706, 680);
+        core.addColorStop(0, `rgba(126, 255, 76, ${(0.18 * mix + auraFlash * 0.16).toFixed(3)})`);
+        core.addColorStop(0.28, `rgba(126, 255, 76, ${(0.12 * mix + auraFlash * 0.1).toFixed(3)})`);
+        core.addColorStop(0.68, `rgba(126, 255, 76, ${(0.03 * mix).toFixed(3)})`);
+        core.addColorStop(1, "rgba(126, 255, 76, 0)");
+        ctx.fillStyle = core;
+        ctx.beginPath();
+        ctx.ellipse(WORLD.width / 2, 440, (WORLD.width - 80) / 2, (WORLD.height - 180) / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const rise = ctx.createLinearGradient(0, 344, 0, 760);
+        rise.addColorStop(0, "rgba(126, 255, 76, 0)");
+        rise.addColorStop(0.56, `rgba(126, 255, 76, ${(0.04 * mix + auraFlash * 0.06).toFixed(3)})`);
+        rise.addColorStop(1, `rgba(126, 255, 76, ${(0.12 * mix + auraFlash * 0.08).toFixed(3)})`);
+        ctx.fillStyle = rise;
+        ctx.beginPath();
+        ctx.ellipse(WORLD.width / 2, 547, WORLD.width / 2, 215, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function drawHorizonMist(neonMix, pulseFlash) {
+        const mist = ctx.createLinearGradient(0, 396, 0, 654);
+        mist.addColorStop(0, "rgba(50, 92, 132, 0)");
+        mist.addColorStop(0.44, "rgba(32, 60, 90, 0.1)");
+        mist.addColorStop(1, "rgba(5, 10, 18, 0.4)");
+        ctx.fillStyle = mist;
+        ctx.fillRect(0, 356, WORLD.width, 320);
+
+        if (neonMix > 0.01) {
+          const glow = ctx.createLinearGradient(0, 430, 0, 690);
+          glow.addColorStop(0, "rgba(126, 255, 76, 0)");
+          glow.addColorStop(0.64, `rgba(126, 255, 76, ${(0.03 * neonMix + pulseFlash * 0.06).toFixed(3)})`);
+          glow.addColorStop(1, `rgba(126, 255, 76, ${(0.06 * neonMix + pulseFlash * 0.12).toFixed(3)})`);
+          ctx.fillStyle = glow;
+          ctx.fillRect(0, 402, WORLD.width, 320);
+        }
+      }
+
+      function drawParapetLights(neonMix, pulseFlash) {
+        state.parapetLights.forEach((light) => {
+          const alpha = light.alpha * (0.6 + 0.4 * Math.sin(state.ambientTime * light.pulse + light.phase));
+          const greenMix = neonMix * light.neonBias;
+          const red = Math.round(lerp(92, 132, greenMix * 0.42));
+          const green = Math.round(lerp(144, 255, greenMix));
+          const blue = Math.round(lerp(112, 90, greenMix * 0.74));
+          const glowBoost = 1 + pulseFlash * (0.5 + light.neonBias * 2);
+
+          if (greenMix > 0.05) {
+            ctx.fillStyle = `rgba(126, 255, 76, ${(alpha * 0.14 * glowBoost).toFixed(3)})`;
+            ctx.beginPath();
+            ctx.arc(light.x, light.y, light.size * 2.6, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, ${(alpha * glowBoost).toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(light.x, light.y, light.size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      function drawNeonParticles(neonMix, pulseFlash) {
+        if (neonMix <= 0.01) {
+          return;
+        }
+
+        state.neonParticles.forEach((particle) => {
+          const x = particle.x + Math.sin(state.ambientTime * (0.2 + particle.depth * 0.5) + particle.phase) * particle.driftX;
+          const y = particle.y + Math.cos(state.ambientTime * (0.24 + particle.depth * 0.7) + particle.phase) * particle.driftY;
+          const pulse = 0.5 + 0.5 * Math.sin(state.ambientTime * particle.pulse + particle.phase);
+          const alpha = neonMix * particle.alpha * (0.45 + pulse * 0.55) * (1 + pulseFlash * 1.8);
+          const radius = particle.size * (0.7 + pulseFlash * 0.6);
+          const red = Math.round(118 + particle.hueShift);
+          const green = Math.round(240 + particle.hueShift * 0.3);
+          const blue = Math.round(74 - particle.hueShift * 0.4);
+
+          ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, ${(alpha * 0.22).toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(x, y, radius * 2.2, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, ${alpha.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      function drawRooftopBase(neonMix, pulseFlash) {
+        ctx.fillStyle = "#0f131b";
+        ctx.beginPath();
+        ctx.moveTo(0, 566);
+        ctx.lineTo(WORLD.width, 542);
+        ctx.lineTo(WORLD.width, 632);
+        ctx.lineTo(0, 646);
+        ctx.closePath();
+        ctx.fill();
+
+        const cap = ctx.createLinearGradient(0, 540, 0, 632);
+        cap.addColorStop(0, "#181f29");
+        cap.addColorStop(1, "#0d121a");
+        ctx.fillStyle = cap;
+        ctx.fillRect(0, 544, WORLD.width, 42);
+
+        ctx.fillStyle = "rgba(185, 205, 235, 0.04)";
+        ctx.fillRect(0, 544, WORLD.width, 8);
+
+        if (neonMix > 0.01) {
+          ctx.fillStyle = `rgba(126, 255, 76, ${(0.02 * neonMix + pulseFlash * 0.12).toFixed(3)})`;
+          ctx.fillRect(0, 544, WORLD.width, 5);
+        }
+
+        const floor = ctx.createLinearGradient(0, 620, 0, WORLD.height);
+        floor.addColorStop(0, "#121822");
+        floor.addColorStop(0.38, "#0c1118");
+        floor.addColorStop(1, "#04070c");
+        ctx.fillStyle = floor;
+        ctx.beginPath();
+        ctx.moveTo(0, 632);
+        ctx.lineTo(WORLD.width, 606);
+        ctx.lineTo(WORLD.width, WORLD.height);
+        ctx.lineTo(0, WORLD.height);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(90, 108, 136, 0.06)";
+        ctx.lineWidth = 2;
+        for (let index = 0; index < 11; index += 1) {
+          const y = 650 + index * 24;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(WORLD.width, y - 28);
+          ctx.stroke();
+        }
+
+        ctx.strokeStyle = "rgba(56, 76, 102, 0.05)";
+        for (let index = -2; index < 13; index += 1) {
+          const x = 180 + index * 112;
+          ctx.beginPath();
+          ctx.moveTo(x, WORLD.height);
+          ctx.lineTo(720 + index * 24, 620);
+          ctx.stroke();
+        }
+
+        state.puddles.forEach((puddle) => {
+          const puddleGlow = ctx.createRadialGradient(
+            puddle.x,
+            puddle.y,
+            puddle.radiusY * 0.2,
+            puddle.x,
+            puddle.y,
+            puddle.radiusX
+          );
+          puddleGlow.addColorStop(0, `rgba(58, 88, 128, ${(puddle.alpha * 0.95).toFixed(3)})`);
+          puddleGlow.addColorStop(1, "rgba(58, 88, 128, 0)");
+          ctx.fillStyle = puddleGlow;
+          ctx.beginPath();
+          ctx.ellipse(puddle.x, puddle.y, puddle.radiusX, puddle.radiusY, -0.06, 0, Math.PI * 2);
+          ctx.fill();
+
+          if (neonMix > 0.01) {
+            const greenGlow = ctx.createRadialGradient(
+              puddle.x,
+              puddle.y,
+              puddle.radiusY * 0.1,
+              puddle.x,
+              puddle.y,
+              puddle.radiusX
+            );
+            greenGlow.addColorStop(0, `rgba(126, 255, 76, ${(0.03 * neonMix + pulseFlash * 0.08).toFixed(3)})`);
+            greenGlow.addColorStop(1, "rgba(126, 255, 76, 0)");
+            ctx.fillStyle = greenGlow;
+            ctx.beginPath();
+            ctx.ellipse(puddle.x, puddle.y, puddle.radiusX, puddle.radiusY, -0.06, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          ctx.strokeStyle = "rgba(144, 174, 214, 0.08)";
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.ellipse(puddle.x, puddle.y, puddle.radiusX, puddle.radiusY, -0.06, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+      }
+
+      function drawWaterTank(neonMix, pulseFlash) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.34)";
+        ctx.beginPath();
+        ctx.ellipse(226, 646, 104, 18, -0.08, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#0d1218";
+        [
+          [162, 494, 18, 136],
+          [264, 488, 18, 142],
+          [194, 508, 18, 122],
+          [232, 504, 18, 126]
+        ].forEach(([x, y, width, height]) => {
+          ctx.fillRect(x, y, width, height);
+        });
+
+        const tankBody = ctx.createLinearGradient(128, 380, 128, 520);
+        tankBody.addColorStop(0, "#212938");
+        tankBody.addColorStop(0.56, "#171f2a");
+        tankBody.addColorStop(1, "#10161f");
+        ctx.fillStyle = tankBody;
+        ctx.beginPath();
+        ctx.ellipse(220, 398, 102, 30, 0, Math.PI, 0);
+        ctx.lineTo(322, 472);
+        ctx.ellipse(220, 472, 102, 28, 0, 0, Math.PI, false);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(208, 224, 255, 0.05)";
+        ctx.beginPath();
+        ctx.ellipse(206, 398, 80, 14, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (neonMix > 0.01) {
+          ctx.strokeStyle = `rgba(126, 255, 76, ${(0.05 * neonMix + pulseFlash * 0.18).toFixed(3)})`;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.ellipse(220, 398, 102, 30, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        ctx.strokeStyle = "rgba(212, 226, 255, 0.08)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(220, 398, 102, 30, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = "#0b1015";
+        ctx.fillRect(142, 446, 156, 12);
+      }
+
+      function drawVent(vent, neonMix, pulseFlash) {
+        const fanSpin = state.reducedMotion ? 0 : Math.sin(state.ambientTime * 2 + vent.fanPhase) * 0.2;
+        const ledPulse = 0.5 + 0.5 * Math.sin(state.ambientTime * 2.8 + vent.ledPhase);
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.24)";
+        ctx.beginPath();
+        ctx.ellipse(vent.x + vent.width * 0.5, vent.y + vent.height + 10, vent.width * 0.48, 12, -0.04, 0, Math.PI * 2);
+        ctx.fill();
+
+        const box = ctx.createLinearGradient(vent.x, vent.y, vent.x, vent.y + vent.height);
+        box.addColorStop(0, "#1a212d");
+        box.addColorStop(1, "#0b1018");
+        ctx.fillStyle = box;
+        ctx.fillRect(vent.x, vent.y, vent.width, vent.height);
+
+        ctx.strokeStyle = "rgba(182, 202, 232, 0.06)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(vent.x + 1, vent.y + 1, vent.width - 2, vent.height - 2);
+
+        ctx.fillStyle = "#060b11";
+        ctx.fillRect(vent.x + 16, vent.y + 12, vent.width - 32, vent.height - 24);
+
+        if (neonMix > 0.01) {
+          ctx.fillStyle = `rgba(126, 255, 76, ${(0.03 * neonMix + pulseFlash * 0.16).toFixed(3)})`;
+          ctx.fillRect(vent.x + 14, vent.y + 10, vent.width - 28, 3);
+
+          ctx.fillStyle = `rgba(126, 255, 76, ${(0.04 * neonMix * ledPulse + pulseFlash * 0.24).toFixed(3)})`;
+          ctx.fillRect(vent.x + vent.width - 20, vent.y + 16, 6, 6);
+        }
+
+        ctx.save();
+        ctx.translate(vent.x + vent.width * 0.5, vent.y + vent.height * 0.5);
+        ctx.rotate(fanSpin);
+        ctx.fillStyle = "rgba(152, 174, 206, 0.12)";
+
+        for (let blade = 0; blade < 4; blade += 1) {
+          ctx.rotate(Math.PI / 2);
+          ctx.beginPath();
+          ctx.moveTo(0, -4);
+          ctx.quadraticCurveTo(16, -12, 28, -2);
+          ctx.quadraticCurveTo(16, 3, 0, 4);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        ctx.restore();
+
+        ctx.strokeStyle = "rgba(104, 126, 154, 0.16)";
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(vent.x + vent.width * 0.5, vent.y + vent.height * 0.5, vent.height * 0.24, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      function drawBeerBottle(x, baseY, height, neonMix, pulseFlash, tilt = 0) {
+        ctx.save();
+        ctx.translate(x, baseY);
+        ctx.rotate(tilt);
+
+        const bottleWidth = height * 0.22;
+        const neckWidth = bottleWidth * 0.42;
+        const neckHeight = height * 0.28;
+        const bodyHeight = height - neckHeight;
+        const greenGlow = neonMix * 0.24 + pulseFlash * 0.38;
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+        ctx.beginPath();
+        ctx.ellipse(0, 6, bottleWidth * 1.2, 3.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const glass = ctx.createLinearGradient(0, -height, 0, 0);
+        glass.addColorStop(0, "#6f4b15");
+        glass.addColorStop(0.3, "#5a3910");
+        glass.addColorStop(1, "#2b1807");
+        ctx.fillStyle = glass;
+        ctx.beginPath();
+        ctx.moveTo(-neckWidth * 0.5, -height);
+        ctx.lineTo(neckWidth * 0.5, -height);
+        ctx.lineTo(bottleWidth * 0.34, -bodyHeight);
+        ctx.lineTo(bottleWidth * 0.5, -bodyHeight * 0.15);
+        ctx.quadraticCurveTo(0, 4, -bottleWidth * 0.5, -bodyHeight * 0.15);
+        ctx.lineTo(-bottleWidth * 0.34, -bodyHeight);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(235, 221, 158, 0.34)";
+        ctx.fillRect(-bottleWidth * 0.18, -bodyHeight * 0.72, bottleWidth * 0.36, bodyHeight * 0.2);
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+        ctx.fillRect(-bottleWidth * 0.24, -bodyHeight * 0.92, bottleWidth * 0.1, bodyHeight * 0.72);
+
+        if (greenGlow > 0.01) {
+          ctx.fillStyle = `rgba(126, 255, 76, ${(greenGlow * 0.18).toFixed(3)})`;
+          ctx.fillRect(-bottleWidth * 0.28, -bodyHeight * 0.92, bottleWidth * 0.14, bodyHeight * 0.84);
+        }
+
+        ctx.fillStyle = "#a6acb8";
+        ctx.fillRect(-neckWidth * 0.42, -height - 2, neckWidth * 0.84, 4);
+        ctx.restore();
+      }
+
+      function drawBeerTable(neonMix, pulseFlash) {
+        const tableX = 622;
+        const tableY = 640;
+        const tableGlow = neonMix * 0.08 + pulseFlash * 0.16;
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+        ctx.beginPath();
+        ctx.ellipse(tableX + 10, tableY + 76, 120, 16, -0.04, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#0d1218";
+        ctx.fillRect(tableX + 2, tableY - 4, 16, 72);
+        ctx.fillRect(tableX - 60, tableY + 42, 12, 68);
+        ctx.fillRect(tableX + 64, tableY + 36, 12, 74);
+
+        const top = ctx.createLinearGradient(tableX - 100, tableY - 26, tableX + 110, tableY + 10);
+        top.addColorStop(0, "#2c2119");
+        top.addColorStop(1, "#16110d");
+        ctx.fillStyle = top;
+        ctx.beginPath();
+        ctx.moveTo(tableX - 104, tableY - 12);
+        ctx.lineTo(tableX + 94, tableY - 24);
+        ctx.lineTo(tableX + 110, tableY + 8);
+        ctx.lineTo(tableX - 88, tableY + 18);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+        ctx.beginPath();
+        ctx.moveTo(tableX - 90, tableY - 6);
+        ctx.lineTo(tableX + 72, tableY - 16);
+        ctx.lineTo(tableX + 84, tableY - 2);
+        ctx.lineTo(tableX - 76, tableY + 6);
+        ctx.closePath();
+        ctx.fill();
+
+        if (tableGlow > 0.01) {
+          ctx.fillStyle = `rgba(126, 255, 76, ${tableGlow.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.moveTo(tableX - 90, tableY - 8);
+          ctx.lineTo(tableX + 72, tableY - 18);
+          ctx.lineTo(tableX + 84, tableY - 10);
+          ctx.lineTo(tableX - 78, tableY);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        [
+          { x: tableX - 42, y: tableY - 10, height: 56, tilt: -0.06 },
+          { x: tableX - 6, y: tableY - 16, height: 62, tilt: 0.02 },
+          { x: tableX + 30, y: tableY - 8, height: 50, tilt: 0.05 },
+          { x: tableX + 62, y: tableY - 18, height: 64, tilt: -0.03 }
+        ].forEach((bottle) => {
+          drawBeerBottle(bottle.x, bottle.y, bottle.height, neonMix, pulseFlash, bottle.tilt);
+        });
+
+        ctx.fillStyle = "#151c24";
+        ctx.beginPath();
+        ctx.moveTo(tableX + 110, tableY + 10);
+        ctx.lineTo(tableX + 142, tableY + 4);
+        ctx.lineTo(tableX + 174, tableY + 74);
+        ctx.lineTo(tableX + 142, tableY + 78);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(40, 54, 72, 0.8)";
+        ctx.lineWidth = 8;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(tableX + 144, tableY + 16);
+        ctx.lineTo(tableX + 144, tableY + 74);
+        ctx.lineTo(tableX + 104, tableY + 108);
+        ctx.stroke();
+        ctx.lineCap = "butt";
+      }
+
+      function drawFurniture(neonMix, pulseFlash) {
+        drawBeerTable(neonMix, pulseFlash);
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.24)";
+        ctx.beginPath();
+        ctx.ellipse(700, 734, 106, 16, -0.06, 0, Math.PI * 2);
+        ctx.fill();
+
+        const panelGlow = neonMix * 0.06 + pulseFlash * 0.12;
+
+        ctx.fillStyle = "#0b1016";
+        ctx.beginPath();
+        ctx.moveTo(520, 604);
+        ctx.lineTo(592, 592);
+        ctx.lineTo(630, 636);
+        ctx.lineTo(546, 648);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "#0e141d";
+        ctx.beginPath();
+        ctx.moveTo(694, 626);
+        ctx.lineTo(772, 612);
+        ctx.lineTo(786, 694);
+        ctx.lineTo(708, 706);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "#111821";
+        ctx.beginPath();
+        ctx.moveTo(310, 646);
+        ctx.lineTo(452, 646);
+        ctx.lineTo(452, 712);
+        ctx.lineTo(310, 712);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "#05080d";
+        ctx.fillRect(336, 660, 88, 36);
+
+        if (panelGlow > 0.01) {
+          ctx.strokeStyle = `rgba(126, 255, 76, ${panelGlow.toFixed(3)})`;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(312, 648, 138, 62);
+        }
+
+        ctx.fillStyle = "#11161d";
+        ctx.lineWidth = 8;
+        ctx.lineCap = "round";
+        [
+          [646, 636, 618, 746],
+          [706, 632, 690, 746],
+          [774, 640, 802, 742]
+        ].forEach(([x1, y1, x2, y2]) => {
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        });
+        ctx.lineCap = "butt";
+
+        ctx.fillStyle = "#171f29";
+        ctx.beginPath();
+        ctx.moveTo(638, 628);
+        ctx.lineTo(770, 618);
+        ctx.lineTo(786, 646);
+        ctx.lineTo(650, 658);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      function drawFigureSprite(sprite, options = {}) {
+        const phoneMix = options.phoneMix || 0;
+        const neonMix = options.neonMix || 0;
+        const pulseFlash = options.pulseFlash || 0;
+        const rimAlpha = 0.03 + neonMix * 0.08 + pulseFlash * 0.12;
+        const sway = state.reducedMotion ? 0 : Math.sin(state.ambientTime * 0.85) * 2.8;
+        const rimGreen = Math.round(lerp(155, 255, neonMix));
+        const rimBlue = Math.round(lerp(185, 115, neonMix));
+
+        ctx.save();
+        ctx.translate(WORLD.width / 2, 612 + sway);
+        ctx.rotate(-0.008 - phoneMix * 0.018 + (state.reducedMotion ? 0 : Math.sin(state.ambientTime * 0.52) * 0.012));
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+        ctx.beginPath();
+        ctx.ellipse(0, 144, 78, 14, -0.04, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (rimAlpha > 0.01) {
+          ctx.save();
+          ctx.globalAlpha = Math.min(0.82, rimAlpha * 1.48);
+          ctx.shadowColor = `rgba(115, ${rimGreen}, ${rimBlue}, ${Math.min(0.92, rimAlpha * 1.2).toFixed(3)})`;
+          ctx.shadowBlur = 20 + neonMix * 8 + pulseFlash * 18;
+          ctx.drawImage(
+            figureSprite,
+            sprite.sx,
+            sprite.sy,
+            sprite.sw,
+            sprite.sh,
+            sprite.dx,
+            sprite.dy,
+            sprite.dw,
+            sprite.dh
+          );
+          ctx.restore();
+        }
+
+        ctx.save();
+        ctx.shadowColor = `rgba(126, 255, 76, ${(0.03 + pulseFlash * 0.04).toFixed(3)})`;
+        ctx.shadowBlur = 10 + pulseFlash * 8;
+        ctx.filter = `brightness(${(0.9 + neonMix * 0.04).toFixed(3)}) saturate(${(0.9 + neonMix * 0.16).toFixed(3)})`;
+        ctx.drawImage(
+          figureSprite,
+          sprite.sx,
+          sprite.sy,
+          sprite.sw,
+          sprite.sh,
+          sprite.dx,
+          sprite.dy,
+          sprite.dw,
+          sprite.dh
+        );
+        ctx.restore();
+
+        ctx.restore();
+      }
+
+      function drawFigure(options = {}) {
+        const phoneMix = options.phoneMix || 0;
+        if (!state.figureSpriteReady) {
+          return;
+        }
+
+        drawFigureSprite(phoneMix > 0.02 ? FIGURE_SPRITES.phone : FIGURE_SPRITES.idle, options);
+      }
+
+      function drawAntennaCluster(neonMix, pulseFlash) {
+        const blink = 0.32 + 0.68 * smoothstep((Math.sin(state.ambientTime * 2.7) + 1) * 0.5);
+        const greenLine = neonMix * 0.05 + pulseFlash * 0.12;
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+        ctx.beginPath();
+        ctx.ellipse(1416, 650, 122, 16, -0.05, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#0c121a";
+        ctx.fillRect(1374, 536, 26, 110);
+        ctx.fillRect(1460, 520, 24, 126);
+
+        ctx.strokeStyle = "#16202b";
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(1428, 338);
+        ctx.lineTo(1428, 540);
+        ctx.moveTo(1448, 358);
+        ctx.lineTo(1448, 520);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#243044";
+        ctx.lineWidth = 2;
+        for (let index = 0; index < 4; index += 1) {
+          const y = 376 + index * 34;
+          ctx.beginPath();
+          ctx.moveTo(1412, y);
+          ctx.lineTo(1464, y);
+          ctx.stroke();
+        }
+
+        ctx.strokeStyle = "#313c50";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(1428, 338);
+        ctx.lineTo(1428, 280);
+        ctx.moveTo(1448, 358);
+        ctx.lineTo(1448, 304);
+        ctx.stroke();
+
+        ctx.fillStyle = `rgba(126, 255, 76, ${(0.12 + blink * 0.58 + neonMix * 0.12).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(1428, 280, 4, 0, Math.PI * 2);
+        ctx.arc(1448, 304, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = "#33425c";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(1362, 488, 36, -0.9, 1.8);
+        ctx.stroke();
+
+        ctx.fillStyle = "#121923";
+        ctx.beginPath();
+        ctx.moveTo(1332, 474);
+        ctx.quadraticCurveTo(1366, 444, 1392, 488);
+        ctx.quadraticCurveTo(1358, 510, 1332, 474);
+        ctx.closePath();
+        ctx.fill();
+
+        if (greenLine > 0.01) {
+          ctx.strokeStyle = `rgba(126, 255, 76, ${greenLine.toFixed(3)})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(1428, 402);
+          ctx.lineTo(1448, 402);
+          ctx.moveTo(1428, 436);
+          ctx.lineTo(1448, 436);
+          ctx.stroke();
+        }
+      }
+
+      function drawCables(neonMix, pulseFlash) {
+        const sway = state.reducedMotion ? 0 : Math.sin(state.ambientTime * 0.6) * 10;
+
+        [
+          [278, 414, 1418, 378, 132],
+          [306, 442, 1450, 428, 94]
+        ].forEach(([x1, y1, x2, y2, sag], index) => {
+          ctx.strokeStyle = "rgba(22, 30, 42, 0.92)";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.bezierCurveTo(
+            x1 + (x2 - x1) * 0.25,
+            y1 + sag + sway,
+            x1 + (x2 - x1) * 0.72,
+            y2 + sag - sway,
+            x2,
+            y2
+          );
+          ctx.stroke();
+
+          if (neonMix > 0.01 && index === 1) {
+            ctx.strokeStyle = `rgba(126, 255, 76, ${(0.01 * neonMix + pulseFlash * 0.08).toFixed(3)})`;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.bezierCurveTo(
+              x1 + (x2 - x1) * 0.25,
+              y1 + sag + sway,
+              x1 + (x2 - x1) * 0.72,
+              y2 + sag - sway,
+              x2,
+              y2
+            );
+            ctx.stroke();
+          }
+        });
+      }
+
+      function drawForegroundGlow(neonMix, pulseFlash) {
+        const blueGlow = ctx.createLinearGradient(0, 580, 0, WORLD.height);
+        blueGlow.addColorStop(0, "rgba(36, 72, 54, 0)");
+        blueGlow.addColorStop(0.42, "rgba(36, 72, 54, 0.05)");
+        blueGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
+        ctx.fillStyle = blueGlow;
+        ctx.fillRect(0, 580, WORLD.width, WORLD.height - 580);
+
+        if (neonMix > 0.01) {
+          const greenGlow = ctx.createLinearGradient(0, 600, 0, WORLD.height);
+          greenGlow.addColorStop(0, "rgba(126, 255, 76, 0)");
+          greenGlow.addColorStop(0.55, `rgba(126, 255, 76, ${(0.04 * neonMix).toFixed(3)})`);
+          greenGlow.addColorStop(1, `rgba(126, 255, 76, ${(0.06 * neonMix + pulseFlash * 0.12).toFixed(3)})`);
+          ctx.fillStyle = greenGlow;
+          ctx.fillRect(0, 580, WORLD.width, WORLD.height - 580);
+        }
+      }
+
+      function drawScreenVignette(neonMix, pulseFlash) {
+        const vignette = ctx.createRadialGradient(
+          state.width * 0.5,
+          state.height * 0.42,
+          state.width * 0.14,
+          state.width * 0.5,
+          state.height * 0.58,
+          state.width * 0.8
+        );
+        vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
+        vignette.addColorStop(0.54, "rgba(0, 0, 0, 0.26)");
+        vignette.addColorStop(1, "rgba(0, 0, 0, 0.86)");
+        ctx.fillStyle = vignette;
+        ctx.fillRect(0, 0, state.width, state.height);
+
+        const frame = ctx.createLinearGradient(0, 0, 0, state.height);
+        frame.addColorStop(0, "rgba(0, 0, 0, 0.22)");
+        frame.addColorStop(0.22, "rgba(0, 0, 0, 0)");
+        frame.addColorStop(0.76, "rgba(0, 0, 0, 0)");
+        frame.addColorStop(1, "rgba(0, 0, 0, 0.42)");
+        ctx.fillStyle = frame;
+        ctx.fillRect(0, 0, state.width, state.height);
+
+        if (neonMix > 0.01) {
+          const greenFrame = ctx.createLinearGradient(0, state.height * 0.62, 0, state.height);
+          greenFrame.addColorStop(0, "rgba(126, 255, 76, 0)");
+          greenFrame.addColorStop(1, `rgba(126, 255, 76, ${(0.025 * neonMix + pulseFlash * 0.06).toFixed(3)})`);
+          ctx.fillStyle = greenFrame;
+          ctx.fillRect(0, state.height * 0.58, state.width, state.height * 0.42);
+        }
+      }
+
+      function drawPulseFlashOverlay(neonMix, pulseFlash) {
+        if (neonMix <= 0.01 && pulseFlash <= 0.01) {
+          return;
+        }
+
+        const overlay = ctx.createRadialGradient(
+          state.width * 0.55,
+          state.height * 0.62,
+          state.width * 0.12,
+          state.width * 0.55,
+          state.height * 0.62,
+          state.width * 0.56
+        );
+        overlay.addColorStop(0, `rgba(126, 255, 76, ${(0.02 * neonMix + pulseFlash * 0.12).toFixed(3)})`);
+        overlay.addColorStop(0.48, `rgba(126, 255, 76, ${(0.01 * neonMix + pulseFlash * 0.05).toFixed(3)})`);
+        overlay.addColorStop(1, "rgba(126, 255, 76, 0)");
+        ctx.fillStyle = overlay;
+        ctx.fillRect(0, 0, state.width, state.height);
+      }
+
+      function drawIntroBlackout() {
+        const blackout = getIntroBlackout(state.currentTime);
+        if (blackout <= 0.001) {
+          return;
+        }
+
+        ctx.fillStyle = `rgba(0, 0, 0, ${blackout.toFixed(3)})`;
+        ctx.fillRect(0, 0, state.width, state.height);
+      }
+
+      function drawFinalBlackout(amount) {
+        if (amount <= 0.001) {
+          return;
+        }
+
+        ctx.fillStyle = `rgba(0, 0, 0, ${amount.toFixed(3)})`;
+        ctx.fillRect(0, 0, state.width, state.height);
+      }
+
+      function drawScene() {
+        if (!ctx || !state.width || !state.height) {
+          return;
+        }
+
+        const phoneMix = getPhoneCallMix(state.currentTime);
+        const effectState = getEffectState(state.currentTime);
+        const neonMix = effectState.neonMix;
+        const pulseFlash = effectState.pulseFlash;
+
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+
+        drawBackground(neonMix);
+        beginWorldTransform();
+        drawMoon(neonMix, pulseFlash);
+        drawStars(effectState.starNeonMix, effectState.beatPulse, effectState.constellationMix, effectState.activeBeatIndex);
+        drawClouds();
+        drawConstellations(effectState.constellationMix, effectState.highlight);
+        drawCityLayer(state.farBuildings, 530, {
+          top: "#0b121b",
+          bottom: "#060a11",
+          side: "#04080f",
+          cap: "rgba(180, 204, 240, 0.028)",
+          line: "rgba(110, 138, 172, 0.05)",
+          roof: "rgba(106, 128, 160, 0.18)",
+          windowStrength: 0.48
+        }, effectState.windowGlowMix, pulseFlash);
+        drawHorizonMist(neonMix, pulseFlash);
+        drawStreetAura(effectState.auraBase, effectState.auraFlash, effectState.beatPulse);
+        drawCityLayer(state.nearBuildings, 586, {
+          top: "#101924",
+          bottom: "#070d15",
+          side: "#060b12",
+          cap: "rgba(210, 226, 255, 0.04)",
+          line: "rgba(130, 156, 186, 0.06)",
+          roof: "rgba(120, 142, 174, 0.26)",
+          windowStrength: 0.68
+        }, effectState.windowGlowMix, pulseFlash);
+        drawNeonParticles(neonMix, pulseFlash);
+        drawParapetLights(neonMix, pulseFlash);
+        drawRooftopBase(neonMix, pulseFlash);
+        drawWaterTank(neonMix, pulseFlash);
+        state.vents.forEach((vent) => {
+          drawVent(vent, neonMix, pulseFlash);
+        });
+        drawFurniture(neonMix, pulseFlash);
+        drawFigure({ phoneMix, neonMix, pulseFlash });
+        drawAntennaCluster(neonMix, pulseFlash);
+        drawCables(neonMix, pulseFlash);
+        drawForegroundGlow(neonMix, pulseFlash);
+        endWorldTransform();
+        drawPulseFlashOverlay(neonMix, pulseFlash);
+        drawScreenVignette(neonMix, pulseFlash);
+        drawIntroBlackout();
+        drawFinalBlackout(effectState.finalBlackout);
+      }
+
+      function animate(timestamp) {
+        if (!ctx) {
+          return;
+        }
+
+        if (!state.lastFrameTime) {
+          state.lastFrameTime = timestamp;
+        }
+
+        const delta = Math.min((timestamp - state.lastFrameTime) / 1000, 0.05);
+        state.lastFrameTime = timestamp;
+        state.ambientTime += delta;
+
+        drawScene();
+        state.frameId = requestAnimationFrame(animate);
+      }
+
+      window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (!data || typeof data.type !== "string") {
+          return;
+        }
+
+        if (data.type === ROOFTOP_CONFIG_MESSAGE_TYPE) {
+          state.effectTimeline = buildEffectTimeline(data.effects, state.duration);
+          return;
+        }
+
+        if (data.type !== ROOFTOP_MESSAGE_TYPE) {
+          return;
+        }
+
+        const nextTime = Number(data.currentTime);
+        const nextDuration = Number(data.duration);
+
+        if (Number.isFinite(nextTime)) {
+          state.currentTime = Math.max(0, nextTime);
+        }
+
+        if (Number.isFinite(nextDuration) && nextDuration > 0) {
+          state.duration = nextDuration;
+          state.effectTimeline = buildEffectTimeline(state.effectTimeline.events, state.duration);
+        }
+
+        if (typeof data.started === "boolean") {
+          state.started = data.started;
+        }
+      });
+
+      window.addEventListener("resize", () => {
+        resize();
+      });
+
+      seedScene();
+      resize();
+      state.frameId = requestAnimationFrame(animate);
+    </script>
+  </body>
+</html>

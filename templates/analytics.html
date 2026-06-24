@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Analytics - ProvingChill</title>
+    <link rel="icon" type="image/png" href="{{ url_for('serve_media', filename='favicon.png') }}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Syne:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body
+    data-authenticated="{{ '1' if auth_user else '0' }}"
+    data-username="{{ auth_user.username if auth_user else '' }}"
+    data-role="{{ auth_user.role if auth_user else '' }}"
+    data-page="analytics"
+  >
+    <div class="bg-noise" aria-hidden="true"></div>
+    <div class="bg-shape bg-shape-a" aria-hidden="true"></div>
+    <div class="bg-shape bg-shape-b" aria-hidden="true"></div>
+    {% set flash_messages = get_flashed_messages(with_categories=true) %}
+    {% set auth_jump_href = url_for('projects_page') %}
+    {% set auth_jump_label = 'Ir a proyectos' %}
+    {% set auth_return_path = request.path %}
+    {% include "_site_nav.html" %}
+
+    <main class="wrapper chat-page-shell">
+      <section class="panel analytics" id="estadisticas" data-nav-section>
+        <div class="section-header">
+          <div>
+            <p class="chart-kicker">Lectura del trafico</p>
+            <h1>Vistas de proyectos en planos cartesianos</h1>
+          </div>
+        </div>
+        <div id="status" class="status" aria-live="polite"></div>
+
+        <div class="analytics-stack">
+          <article class="analytics-overview">
+            <div class="chart-head">
+              <div>
+                <p class="chart-kicker">Plano cartesiano</p>
+                <h2>Vistas de proyectos x tiempo por origen</h2>
+              </div>
+              <span id="origin-time-caption" class="chart-caption">Esperando datos...</span>
+            </div>
+            <div id="origin-time-chart" class="timeline-plane-chart" aria-live="polite"></div>
+            <div id="origin-time-legend" class="visit-plane-legend" aria-live="polite"></div>
+          </article>
+
+          <article class="analytics-overview">
+            <div class="chart-head">
+              <div>
+                <p class="chart-kicker">Plano cartesiano</p>
+                <h2>Vistas x tiempo por proyecto</h2>
+              </div>
+              <span id="pages-plane-caption" class="chart-caption">Esperando datos...</span>
+            </div>
+            <div id="pages-plane-chart" class="visit-plane-chart" aria-live="polite"></div>
+            <div id="pages-plane-legend" class="visit-plane-legend" aria-live="polite"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      window.__APP_CONTEXT__ = {{ {"authenticated": auth_user is not none, "user": auth_user if auth_user else None, "timezone": app_timezone_name}|tojson }};
+    </script>
+    <script
+      src="https://cdn.socket.io/4.7.5/socket.io.min.js"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  </body>
+</html>

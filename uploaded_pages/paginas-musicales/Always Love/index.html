@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/jpeg" href="media/favicon.jpg">
+    <title>Always Love - d4vd</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: "Arial Black", "Impact", sans-serif;
+      }
+
+      body.mode-dark {
+        background: #000;
+        color: #fff;
+      }
+
+      body.mode-light {
+        background: #fff;
+        color: #000;
+      }
+
+      #leaf-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+      }
+
+      .leaf {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 14px;
+        height: 20px;
+        border-radius: 82% 0 82% 0;
+        background: linear-gradient(
+          160deg,
+          rgba(255, 176, 105, 0.96),
+          rgba(229, 82, 40, 0.86) 52%,
+          rgba(145, 20, 20, 0.72)
+        );
+        box-shadow: 0 0 8px rgba(255, 88, 32, 0.3);
+        opacity: 0;
+        transform-origin: 50% 70%;
+        will-change: transform, opacity;
+      }
+
+      .leaf::after {
+        content: "";
+        position: absolute;
+        left: 49%;
+        top: 10%;
+        width: 1px;
+        height: 78%;
+        background: rgba(91, 20, 12, 0.58);
+      }
+
+      .stage {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        padding: 1.2rem;
+      }
+
+      .start-btn {
+        font: inherit;
+        font-size: 0.95rem;
+        border: 1px solid #fff;
+        background: #000;
+        color: #fff;
+        padding: 10px 16px;
+        cursor: pointer;
+      }
+
+      .start-btn:disabled {
+        opacity: 0.45;
+        cursor: wait;
+      }
+
+      .lyric {
+        margin: 0;
+        width: min(95vw, 1600px);
+        min-height: 1.1em;
+        text-align: center;
+        line-height: 0.96;
+        letter-spacing: 0.03em;
+        text-wrap: balance;
+        font-size: clamp(2.1rem, 8.4vw, 8.4rem);
+        color: var(--lyric-color, currentColor);
+        transform: scale(var(--lyric-scale, 1));
+        transform-origin: center;
+        opacity: var(--lyric-opacity, 1);
+        transition: none;
+      }
+
+      .lyric.is-empty {
+        opacity: 0;
+      }
+
+      .word-do-ya-a {
+        color: #ffd090;
+      }
+
+      .word-do-ya-b {
+        color: #ff9f4a;
+      }
+
+      .word-red {
+        color: #e33a3a;
+      }
+
+      .status {
+        margin: 0;
+        min-height: 1rem;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.9rem;
+        color: #d0d0d0;
+      }
+
+      @media (min-width: 1024px) {
+        .lyric {
+          font-size: clamp(1.6rem, 5.2vw, 5.8rem);
+        }
+      }
+
+      audio {
+        display: none;
+      }
+    </style>
+  </head>
+  <body class="mode-dark">
+    <div id="leaf-layer" aria-hidden="true"></div>
+
+    <main class="stage" aria-live="polite">
+      <button id="start-btn" class="start-btn" type="button" disabled>Comenzar secuencia</button>
+      <p id="lyric" class="lyric is-empty"></p>
+      <p id="status" class="status">Cargando timestamps...</p>
+    </main>
+
+    <audio id="audio" preload="auto"></audio>
+
+    <script>
+      (() => {
+        "use strict";
+
+        const AUDIO_PATH = "media/always-love.mp3";
+        const LRC_PATH = "media/always-love.lrc";
+        const LEAF_TIMES = {
+          chorusA: [60.54, 86.56],
+          chorusB: [128.02, 150.59],
+          fast: [154.03, 179.81],
+          taper: [179.81, 190.96],
+          finalSingle: 194.41
+        };
+        const INVERT_WINDOWS = [
+          [95.87, 99.31],
+          [102.78, 103.57],
+          [105.70, 106.51],
+          [109.42, 110.20]
+        ];
+        const SWAY_FREQ_A = 0.18;
+        const SWAY_FREQ_B = 0.07;
+        const DOTS_PATTERN = /^\.+$/;
+        const RED_QUESTION_WORDS = new Set(["feel", "love", "hand", "go", "side", "ride"]);
+        const TAPER_FADE_RANGE = [LEAF_TIMES.taper[0], LEAF_TIMES.finalSingle];
+        const SMALL_LINE_SCALES = [
+          { time: 86.56, scale: 0.84 },
+          { time: 154.03, scale: 0.84 },
+          { time: 155.37, scale: 0.74 },
+          { time: 156.16, scale: 0.66 },
+          { time: 156.96, scale: 0.58 }
+        ];
+
+        const audio = document.getElementById("audio");
+        const leafLayer = document.getElementById("leaf-layer");
+        const startBtn = document.getElementById("start-btn");
+        const lyricEl = document.getElementById("lyric");
+        const statusText = document.getElementById("status");
+
+        let lyricSegments = [];
+        let activeSegmentIndex = -1;
+        let rafId = null;
+        let lastFrameTimeMs = 0;
+        let isReady = false;
+        let leaves = [];
+        let leafSpawnCarry = 0;
+        let finalLeafTriggered = false;
+        let invertStartIndices = [];
+
+        function parseTimestamp(min, sec, fracRaw) {
+          const frac = (fracRaw || "0").padEnd(3, "0").slice(0, 3);
+          return Number(min) * 60 + Number(sec) + Number(frac) / 1000;
+        }
+
+        function cleanLyric(text) {
+          return text
+            .replace(/\s+/g, " ")
+            .replace(/\s+([,.;:!?])/g, "$1")
+            .trim();
+        }
+
+        function clamp(value, min, max) {
+          return Math.min(max, Math.max(min, value));
+        }
+
+        function randomBetween(min, max) {
+          return Math.random() * (max - min) + min;
+        }
+
+        function parseLrc(rawText) {
+          const entries = [];
+          const lines = rawText
+            .replace(/\r/g, "")
+            .replace(/\u00a0/g, " ")
+            .split("\n");
+
+          for (const line of lines) {
+            const tags = [...line.matchAll(/\[(\d{2}):(\d{2})(?:\.(\d{1,3}))?\]/g)];
+            if (!tags.length) {
+              continue;
+            }
+
+            const text = cleanLyric(line.replace(/\[[^\]]+\]/g, " "));
+            if (!text) {
+              continue;
+            }
+
+            for (const tag of tags) {
+              const time = parseTimestamp(tag[1], tag[2], tag[3]);
+              if (Number.isFinite(time)) {
+                entries.push({ time, text });
+              }
+            }
+          }
+
+          return entries.sort((a, b) => a.time - b.time);
+        }
+
+        function setStatus(message, isError = false) {
+          statusText.textContent = message;
+          statusText.style.color = isError ? "#ff6a6a" : "#d0d0d0";
+        }
+
+        function findSegmentIndex(currentTime) {
+          let low = 0;
+          let high = lyricSegments.length - 1;
+          let result = -1;
+
+          while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            if (lyricSegments[mid].time <= currentTime) {
+              result = mid;
+              low = mid + 1;
+            } else {
+              high = mid - 1;
+            }
+          }
+
+          return result;
+        }
+
+        function inRange(time, range) {
+          return time >= range[0] && time <= range[1];
+        }
+
+        function rangeEnvelope(time, start, end, edgeSeconds = 2.6) {
+          const fadeIn = clamp((time - start) / edgeSeconds, 0, 1);
+          const fadeOut = clamp((end - time) / edgeSeconds, 0, 1);
+          return Math.min(fadeIn, fadeOut);
+        }
+
+        function getLeafProfile(time) {
+          if (inRange(time, LEAF_TIMES.chorusA)) {
+            const env = rangeEnvelope(time, LEAF_TIMES.chorusA[0], LEAF_TIMES.chorusA[1]);
+            return { rate: 2.2 * env, speed: 1.0, opacity: 0.82 * env };
+          }
+
+          if (inRange(time, LEAF_TIMES.chorusB)) {
+            const env = rangeEnvelope(time, LEAF_TIMES.chorusB[0], LEAF_TIMES.chorusB[1]);
+            return { rate: 2.4 * env, speed: 1.04, opacity: 0.84 * env };
+          }
+
+          if (inRange(time, LEAF_TIMES.fast)) {
+            return { rate: 6.8, speed: 1.95, opacity: 0.95 };
+          }
+
+          if (inRange(time, LEAF_TIMES.taper)) {
+            const progress = clamp(
+              (time - LEAF_TIMES.taper[0]) / (LEAF_TIMES.taper[1] - LEAF_TIMES.taper[0]),
+              0,
+              1
+            );
+            const inverse = 1 - progress;
+            return {
+              rate: 0.2 + (4.6 * inverse),
+              speed: 1.05 + (1.15 * inverse),
+              opacity: 0.3 + (0.6 * inverse)
+            };
+          }
+
+          return { rate: 0, speed: 1, opacity: 0 };
+        }
+
+        function firstIndexAtOrAfter(timeSeconds) {
+          let low = 0;
+          let high = lyricSegments.length - 1;
+          let answer = lyricSegments.length;
+
+          while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            if (lyricSegments[mid].time >= timeSeconds) {
+              answer = mid;
+              high = mid - 1;
+            } else {
+              low = mid + 1;
+            }
+          }
+
+          return answer;
+        }
+
+        function resolveColorModeForIndex(index) {
+          if (index < 0 || index >= lyricSegments.length) {
+            return "mode-dark";
+          }
+
+          const time = lyricSegments[index].time;
+          for (let i = 0; i < INVERT_WINDOWS.length; i += 1) {
+            const [start, end] = INVERT_WINDOWS[i];
+            if (time >= start && time <= end) {
+              const baseIndex = invertStartIndices[i] ?? index;
+              const relative = Math.max(0, index - baseIndex);
+              return relative % 2 === 0 ? "mode-light" : "mode-dark";
+            }
+          }
+
+          return "mode-dark";
+        }
+
+        function applyColorMode(mode) {
+          const light = mode === "mode-light";
+          document.body.classList.toggle("mode-light", light);
+          document.body.classList.toggle("mode-dark", !light);
+        }
+
+        function near(value, target, tolerance = 0.04) {
+          return Math.abs(value - target) <= tolerance;
+        }
+
+        function normalizeLyricText(text) {
+          return text
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9\s]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        }
+
+        function escapeHtml(text) {
+          return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+        }
+
+        function isDotsOnly(text) {
+          return DOTS_PATTERN.test(text.trim());
+        }
+
+        function getLyricScale(time) {
+          for (const item of SMALL_LINE_SCALES) {
+            if (near(time, item.time)) {
+              return item.scale;
+            }
+          }
+          return 1;
+        }
+
+        function renderLyricHtml(rawText) {
+          function decorateDoYa(text) {
+            let idx = 0;
+            return escapeHtml(text).replace(/do ya/ig, (match) => {
+              idx += 1;
+              const cls = idx === 1 ? "word-do-ya-a" : "word-do-ya-b";
+              return `<span class="${cls}">${match}</span>`;
+            });
+          }
+
+          const trimmed = rawText.trim();
+          const hit = trimmed.match(/^(.*?)([A-Za-zÀ-ÖØ-öø-ÿ']+)\?$/);
+          if (!hit) {
+            return decorateDoYa(rawText);
+          }
+
+          const [, prefix, word] = hit;
+          const normalizedWord = normalizeLyricText(word);
+          if (!RED_QUESTION_WORDS.has(normalizedWord)) {
+            return decorateDoYa(rawText);
+          }
+
+          return `${decorateDoYa(prefix)}<span class="word-red">${escapeHtml(word)}?</span>`;
+        }
+
+        function getLyricOpacity(effectiveTime) {
+          const [start, end] = TAPER_FADE_RANGE;
+          if (effectiveTime <= start) {
+            return 1;
+          }
+          const progress = clamp((effectiveTime - start) / (end - start), 0, 1);
+          return 1 - (0.82 * progress);
+        }
+
+        function applyLyricOpacity(effectiveTime) {
+          if (lyricEl.classList.contains("is-empty")) {
+            lyricEl.style.setProperty("--lyric-opacity", "0");
+            return;
+          }
+          lyricEl.style.setProperty("--lyric-opacity", String(getLyricOpacity(effectiveTime)));
+        }
+
+        function spawnLeaf(options = {}) {
+          const leafEl = document.createElement("span");
+          leafEl.className = "leaf";
+          leafLayer.appendChild(leafEl);
+
+          const viewportWidth = window.innerWidth || 1;
+          const center = Boolean(options.center);
+          const speedMul = options.speedMul ?? 1;
+          const opacityMul = options.opacityMul ?? 1;
+
+          const size = options.sizePx ?? randomBetween(12, 28);
+          const height = size * randomBetween(1.3, 1.55);
+          const startX = center ? viewportWidth / 2 : randomBetween(0, viewportWidth);
+          const startY = center ? -56 : randomBetween(-140, -24);
+
+          leafEl.style.width = `${size.toFixed(1)}px`;
+          leafEl.style.height = `${height.toFixed(1)}px`;
+
+          leaves.push({
+            el: leafEl,
+            baseX: startX,
+            y: startY,
+            ySpeed: randomBetween(85, 165) * speedMul,
+            driftX: center ? randomBetween(-3, 3) : randomBetween(-12, 12),
+            swayAmpA: center ? randomBetween(5, 11) : randomBetween(14, 30),
+            swayAmpB: center ? randomBetween(2, 5) : randomBetween(7, 16),
+            swayPhaseA: randomBetween(0, Math.PI * 2),
+            swayPhaseB: randomBetween(0, Math.PI * 2),
+            rotate: randomBetween(0, 360),
+            rotateSpeed: center ? randomBetween(-26, 26) : randomBetween(-72, 72),
+            age: 0,
+            life: options.lifeSec ?? randomBetween(4.8, 8.2) / Math.max(speedMul, 0.2),
+            baseOpacity: clamp(opacityMul, 0, 1) * randomBetween(0.45, 0.95)
+          });
+        }
+
+        function updateLeaves(dt) {
+          const viewportHeight = window.innerHeight || 1;
+
+          for (let i = leaves.length - 1; i >= 0; i -= 1) {
+            const leaf = leaves[i];
+            leaf.age += dt;
+            leaf.baseX += leaf.driftX * dt;
+            leaf.y += leaf.ySpeed * dt;
+            leaf.rotate += leaf.rotateSpeed * dt;
+
+            const progress = leaf.age / leaf.life;
+            let fade = 1;
+            if (progress < 0.2) {
+              fade = progress / 0.2;
+            } else if (progress > 0.78) {
+              fade = Math.max(0, (1 - progress) / 0.22);
+            }
+
+            const waveX =
+              (Math.sin((leaf.age * SWAY_FREQ_A * Math.PI * 2) + leaf.swayPhaseA) * leaf.swayAmpA) +
+              (Math.sin((leaf.age * SWAY_FREQ_B * Math.PI * 2) + leaf.swayPhaseB) * leaf.swayAmpB);
+            const x = leaf.baseX + waveX;
+
+            leaf.el.style.transform = `translate3d(${x.toFixed(1)}px, ${leaf.y.toFixed(1)}px, 0) rotate(${leaf.rotate.toFixed(1)}deg)`;
+            leaf.el.style.opacity = (leaf.baseOpacity * fade).toFixed(3);
+
+            if (progress >= 1.02 || leaf.y > viewportHeight + 120) {
+              leaf.el.remove();
+              leaves.splice(i, 1);
+            }
+          }
+        }
+
+        function clearLeaves() {
+          for (const leaf of leaves) {
+            leaf.el.remove();
+          }
+          leaves = [];
+          leafSpawnCarry = 0;
+        }
+
+        function updateLeafFx(effectiveTime, dt) {
+          const profile = getLeafProfile(effectiveTime);
+
+          if (profile.rate > 0) {
+            leafSpawnCarry += profile.rate * dt;
+            let burst = 0;
+            while (leafSpawnCarry >= 1 && burst < 14) {
+              spawnLeaf({
+                speedMul: profile.speed,
+                opacityMul: profile.opacity
+              });
+              leafSpawnCarry -= 1;
+              burst += 1;
+            }
+          } else {
+            leafSpawnCarry = Math.max(0, leafSpawnCarry - (dt * 0.8));
+          }
+
+          if (effectiveTime < LEAF_TIMES.finalSingle - 0.4) {
+            finalLeafTriggered = false;
+          }
+
+          if (!finalLeafTriggered && effectiveTime >= LEAF_TIMES.finalSingle) {
+            finalLeafTriggered = true;
+            clearLeaves();
+            spawnLeaf({
+              center: true,
+              speedMul: 1.24,
+              opacityMul: 1,
+              sizePx: 28,
+              lifeSec: 5.8
+            });
+          }
+
+          updateLeaves(dt);
+        }
+
+        function renderSegment(index, effectiveTime, force = false) {
+          if (!force && index === activeSegmentIndex) {
+            return;
+          }
+
+          activeSegmentIndex = index;
+          lyricEl.style.setProperty("--lyric-scale", "1");
+
+          if (index < 0 || index >= lyricSegments.length) {
+            lyricEl.textContent = "";
+            lyricEl.classList.add("is-empty");
+            applyColorMode("mode-dark");
+            lyricEl.style.setProperty("--lyric-opacity", "0");
+            return;
+          }
+
+          const current = lyricSegments[index];
+          if (isDotsOnly(current.text)) {
+            lyricEl.textContent = "";
+            lyricEl.classList.add("is-empty");
+            applyColorMode(resolveColorModeForIndex(index));
+            lyricEl.style.setProperty("--lyric-opacity", "0");
+            return;
+          }
+
+          lyricEl.innerHTML = renderLyricHtml(current.text);
+          lyricEl.classList.remove("is-empty");
+          lyricEl.style.setProperty("--lyric-scale", String(getLyricScale(current.time)));
+          applyColorMode(resolveColorModeForIndex(index));
+          applyLyricOpacity(effectiveTime);
+        }
+
+        function updateLyrics(currentTime, force = false) {
+          const effectiveTime = currentTime;
+          const nextIndex = findSegmentIndex(effectiveTime);
+          renderSegment(nextIndex, effectiveTime, force);
+          applyLyricOpacity(effectiveTime);
+        }
+
+        function stopSyncLoop() {
+          if (rafId !== null) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+          }
+        }
+
+        function syncLoop() {
+          const now = performance.now();
+          const dt = Math.min(Math.max((now - lastFrameTimeMs) / 1000, 0), 0.08);
+          lastFrameTimeMs = now;
+          const effectiveTime = audio.currentTime;
+
+          updateLyrics(audio.currentTime);
+          updateLeafFx(effectiveTime, dt);
+          rafId = requestAnimationFrame(syncLoop);
+        }
+
+        function startSyncLoop() {
+          if (rafId === null) {
+            lastFrameTimeMs = performance.now();
+            rafId = requestAnimationFrame(syncLoop);
+          }
+        }
+
+        async function startSequenceFromBeginning() {
+          if (!isReady) {
+            return;
+          }
+
+          stopSyncLoop();
+          audio.currentTime = 0;
+          activeSegmentIndex = -1;
+          finalLeafTriggered = false;
+          clearLeaves();
+          applyColorMode("mode-dark");
+          renderSegment(-1, 0, true);
+
+          try {
+            await audio.play();
+            startBtn.hidden = true;
+            setStatus("");
+          } catch (error) {
+            setStatus("No se pudo iniciar. Presiona de nuevo.", true);
+            console.error(error);
+          }
+        }
+
+        async function loadResources() {
+          audio.src = encodeURI(AUDIO_PATH);
+
+          const metadataPromise = new Promise((resolve, reject) => {
+            if (audio.readyState >= 1 && Number.isFinite(audio.duration)) {
+              resolve();
+              return;
+            }
+            audio.addEventListener("loadedmetadata", resolve, { once: true });
+            audio.addEventListener("error", () => reject(new Error("No se pudo cargar el audio.")), { once: true });
+          });
+
+          try {
+            const lrcResponse = await fetch(encodeURI(LRC_PATH), { cache: "no-store" });
+            if (!lrcResponse.ok) {
+              throw new Error(`No se pudo leer ${LRC_PATH}`);
+            }
+
+            const rawLrc = await lrcResponse.text();
+            await metadataPromise;
+            lyricSegments = parseLrc(rawLrc);
+
+            if (!lyricSegments.length) {
+              throw new Error("El archivo LRC no tiene timestamps validos.");
+            }
+
+            invertStartIndices = INVERT_WINDOWS.map(([start]) => firstIndexAtOrAfter(start));
+            isReady = true;
+            startBtn.disabled = false;
+            setStatus(`Listo. ${lyricSegments.length} marcas cargadas.`);
+            updateLyrics(0, true);
+          } catch (error) {
+            lyricEl.textContent = "Error";
+            lyricEl.classList.remove("is-empty");
+            startBtn.disabled = true;
+            setStatus("No se pudo cargar LRC/audio. Usa servidor local.", true);
+            console.error(error);
+          }
+        }
+
+        startBtn.addEventListener("click", async () => {
+          await startSequenceFromBeginning();
+        });
+
+        audio.addEventListener("play", () => {
+          startSyncLoop();
+        });
+
+        audio.addEventListener("pause", () => {
+          stopSyncLoop();
+        });
+
+        audio.addEventListener("ended", () => {
+          stopSyncLoop();
+          applyColorMode("mode-dark");
+          setStatus("");
+        });
+
+        audio.playbackRate = 1;
+        audio.volume = 1;
+        loadResources();
+      })();
+    </script>
+  </body>
+</html>
