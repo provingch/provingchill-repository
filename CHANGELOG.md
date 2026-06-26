@@ -5,6 +5,22 @@ Todos los cambios relevantes de este repositorio se documentan acá.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto usa versionado aproximado por releases.
 
 ## [4.0.0] 26-06-2026
+=======
+## [4.0.1] - 2026-06-26
+
+### Changed
+
+- Analytics más privado: cada visita guarda solo fecha, hora, tipo de dispositivo y página visitada.
+- Ya no se persisten referrer, user-agent completo, UTM ni dominios de origen.
+- `/api/visits` devuelve totales por dispositivo en lugar de orígenes o referrers.
+- Versión del portal visible en la barra de navegación (`v4.0.1`).
+- `analytics/*.jsonl` ignorado en git para no subir logs de visitas al repositorio.
+
+### Fixed
+
+- Primer patch post-4.0: se eliminó la exposición de datos de navegación que quedaban en el log de visitas.
+
+## [4.0.0] - 2026-06-26
 
 ### Changed
 
@@ -23,7 +39,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ### Added
 
 - `CHANGELOG.md` del repositorio.
-- `venv/` y `env/` al `.gitignore`.
+- `venv/`, `env/` y `.Trash-1000/` al `.gitignore`.
 
 ## [3.0.0] - 2025
 

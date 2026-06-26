@@ -203,6 +203,16 @@ p {
   background: var(--paper);
 }
 
+.site-nav-version {
+  margin-left: auto;
+  padding-left: 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--steel);
+  white-space: nowrap;
+}
+
 .site-nav-seal {
   width: 2.1rem;
   height: 2.1rem;

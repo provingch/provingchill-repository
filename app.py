@@ -11,7 +11,6 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Callable
-from urllib.parse import urlparse
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -38,6 +37,7 @@ VISITS_LOG_FILE = ANALYTICS_DIR / "visits.jsonl"
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "nigahahhaghaghahahghagha")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 APP_TIMEZONE_NAME = os.getenv("APP_TIMEZONE", os.getenv("TZ", "America/Asuncion"))
+APP_VERSION = os.getenv("APP_VERSION", "4.0.1")
 
 # Frases del efecto typewriter en el banner de inicio (se eligen al azar).
 HOME_BANNER_TYPEWRITER_PHRASES = [
@@ -49,84 +49,6 @@ HOME_BANNER_TYPEWRITER_PHRASES = [
     "Mezclo código, curiosidad y lo que salga.",
 ]
 
-SOURCE_ALIASES = {
-    "ig": "instagram",
-    "insta": "instagram",
-    "instagram": "instagram",
-    "fb": "facebook",
-    "facebook": "facebook",
-    "messenger": "messenger",
-    "telegram": "telegram",
-    "tg": "telegram",
-    "threads": "threads",
-    "wa": "whatsapp",
-    "wsp": "whatsapp",
-    "whatsapp": "whatsapp",
-    "discordapp": "discord",
-    "dc": "discord",
-    "discord": "discord",
-    "twitter": "x",
-    "x": "x",
-    "reddit": "reddit",
-    "linkedin": "linkedin",
-    "tiktok": "tiktok",
-    "youtube": "youtube",
-    "slack": "slack",
-}
-SOURCE_DISPLAY_LABELS = {
-    "direct": "Directo",
-    "link": "Link",
-    "instagram": "Instagram",
-    "discord": "Discord",
-    "whatsapp": "WhatsApp",
-    "facebook": "Facebook",
-    "messenger": "Messenger",
-    "telegram": "Telegram",
-    "threads": "Threads",
-    "x": "X",
-    "reddit": "Reddit",
-    "linkedin": "LinkedIn",
-    "tiktok": "TikTok",
-    "youtube": "YouTube",
-    "slack": "Slack",
-}
-EXPLICIT_SOURCE_QUERY_KEYS = (
-    "utm_source",
-    "source",
-    "via",
-    "platform",
-    "ref_source",
-)
-SOURCE_DOMAIN_MATCHERS = (
-    ("instagram", ("instagram.com",)),
-    ("discord", ("discord.com", "discord.gg", "discordapp.com")),
-    ("whatsapp", ("whatsapp.com", "wa.me")),
-    ("messenger", ("messenger.com", "m.me")),
-    ("facebook", ("facebook.com", "fb.com")),
-    ("telegram", ("telegram.me", "t.me", "telegram.org")),
-    ("threads", ("threads.net",)),
-    ("x", ("x.com", "twitter.com", "t.co")),
-    ("reddit", ("reddit.com", "redd.it")),
-    ("linkedin", ("linkedin.com", "lnkd.in")),
-    ("tiktok", ("tiktok.com",)),
-    ("youtube", ("youtube.com", "youtu.be")),
-    ("slack", ("slack.com", "slack-redir.net")),
-)
-SOURCE_TEXT_SIGNATURES = (
-    ("instagram", ("instagram", "com.instagram.android")),
-    ("discord", ("discord", "discordbot", "com.discord")),
-    ("whatsapp", ("whatsapp", "com.whatsapp")),
-    ("messenger", ("messenger", "com.facebook.orca")),
-    ("facebook", ("facebook", "fban", "fbav", "com.facebook.katana")),
-    ("telegram", ("telegram", "telegrambot", "org.telegram.messenger")),
-    ("threads", ("threads",)),
-    ("x", ("twitter", "com.twitter.android")),
-    ("reddit", ("reddit", "com.reddit.frontpage")),
-    ("linkedin", ("linkedin",)),
-    ("tiktok", ("tiktok", "musical_ly", "ugc.trill")),
-    ("youtube", ("youtube", "com.google.android.youtube")),
-    ("slack", ("slack",)),
-)
 MONTH_LABELS_ES = (
     "ene",
     "feb",
@@ -141,6 +63,12 @@ MONTH_LABELS_ES = (
     "nov",
     "dic",
 )
+DEVICE_LABELS_ES = {
+    "desktop": "Escritorio",
+    "mobile": "Movil",
+    "tablet": "Tablet",
+    "desconocido": "Desconocido",
+}
 PROJECT_CATEGORY_MUSICAL = "musical"
 PROJECT_CATEGORY_INTERACTIVE = "interactive"
 REPO_PAGES_ROOT = Path(
@@ -211,10 +139,14 @@ app.jinja_env.auto_reload = app.config["TEMPLATES_AUTO_RELOAD"]
 app.logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
 
+@app.context_processor
+def inject_app_metadata() -> dict[str, str]:
+    return {"app_version": APP_VERSION}
+
+
 VISITS_LOCK = Lock()
 VISITS_TOTAL = 0
-VISITS_BY_SOURCE: Counter[str] = Counter()
-VISITS_BY_REFERRER: Counter[str] = Counter()
+VISITS_BY_DEVICE: Counter[str] = Counter()
 VISITS_BY_PAGE: Counter[str] = Counter()
 VISIT_EVENTS: list[dict[str, str]] = []
 FAVICON_COLOR_CACHE: dict[str, str | None] = {}
@@ -231,124 +163,54 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def normalize_source(value: str | None) -> str:
-    if value is None:
-        return "direct"
-
-    cleaned = re.sub(r"[^a-z0-9_-]+", "", value.strip().lower())
-    if not cleaned:
-        return "direct"
-    return SOURCE_ALIASES.get(cleaned, cleaned)
-
-
-def extract_explicit_source() -> str:
-    for query_key in EXPLICIT_SOURCE_QUERY_KEYS:
-        raw_value = str(request.args.get(query_key, "") or "").strip()
-        if raw_value:
-            return normalize_source(raw_value)
-    return ""
-
-
-def extract_referrer_domain(referrer: str) -> str:
-    if not referrer:
-        return ""
-
-    try:
-        parsed = urlparse(referrer)
-    except ValueError:
-        return ""
-
-    if not parsed.hostname:
-        return ""
-    return parsed.hostname.lower()
-
-
-def normalize_domain_label(value: str | None) -> str:
+def normalize_device_category(value: str | None) -> str:
     cleaned = str(value or "").strip().lower()
-    if cleaned.startswith("www."):
-        return cleaned[4:]
-    return cleaned
-
-
-def is_internal_referrer(current_host: str, referrer_domain: str) -> bool:
-    normalized_host = normalize_domain_label(current_host)
-    normalized_referrer = normalize_domain_label(referrer_domain)
-    if not normalized_host or not normalized_referrer:
-        return False
-    return (
-        normalized_referrer == normalized_host
-        or normalized_referrer.endswith(f".{normalized_host}")
-    )
-
-
-def infer_source_from_domain(referrer_domain: str) -> str | None:
-    normalized_domain = normalize_domain_label(referrer_domain)
-    if not normalized_domain:
-        return None
-
-    for source, domains in SOURCE_DOMAIN_MATCHERS:
-        if any(
-            normalized_domain == domain or normalized_domain.endswith(f".{domain}")
-            for domain in domains
-        ):
-            return source
-
-    return None
-
-
-def infer_source_from_text(*values: str) -> str | None:
-    haystack = " ".join(str(value or "").strip().lower() for value in values if value).strip()
-    if not haystack:
-        return None
-
-    for source, signatures in SOURCE_TEXT_SIGNATURES:
-        if any(signature in haystack for signature in signatures):
-            return source
-
-    return None
-
-
-def normalize_fetch_site(value: str | None) -> str:
-    cleaned = str(value or "").strip().lower()
-    if cleaned in {"cross-site", "same-origin", "same-site", "none"}:
+    if cleaned in DEVICE_LABELS_ES:
         return cleaned
-    return ""
+    return "desconocido"
 
 
-def infer_source(
+def infer_device_category(user_agent: str | None) -> str:
+    haystack = str(user_agent or "").strip().lower()
+    if not haystack:
+        return "desconocido"
+    if any(token in haystack for token in ("ipad", "tablet", "kindle", "playbook", "silk/")):
+        return "tablet"
+    if any(
+        token in haystack
+        for token in ("mobile", "iphone", "ipod", "android", "blackberry", "phone")
+    ):
+        return "mobile"
+    return "desktop"
+
+
+def format_visit_device_label(device: str) -> str:
+    normalized_device = normalize_device_category(device)
+    return DEVICE_LABELS_ES.get(normalized_device, normalized_device.title())
+
+
+def build_visit_event(
     *,
-    current_host: str,
-    explicit_source: str,
-    referrer_domain: str,
-    user_agent: str,
-    requested_with: str,
-    sec_fetch_site: str,
-) -> str:
-    if is_internal_referrer(current_host, referrer_domain):
-        return "internal"
+    page: str,
+    observed_at: datetime | None = None,
+    device: str | None = None,
+    user_agent: str | None = None,
+) -> dict[str, str]:
+    timestamp = observed_at or datetime.now(timezone.utc)
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
 
-    if explicit_source:
-        return normalize_source(explicit_source)
-
-    requested_with_source = infer_source_from_text(requested_with)
-    if requested_with_source:
-        return requested_with_source
-
-    referrer_source = infer_source_from_domain(referrer_domain)
-    if referrer_source:
-        return referrer_source
-
-    user_agent_source = infer_source_from_text(user_agent)
-    if user_agent_source:
-        return user_agent_source
-
-    if normalize_fetch_site(sec_fetch_site) == "cross-site":
-        return "link"
-
-    if not referrer_domain:
-        return "direct"
-
-    return "link"
+    local_timestamp = timestamp.astimezone(APP_TIMEZONE)
+    resolved_device = normalize_device_category(
+        device or infer_device_category(user_agent)
+    )
+    return {
+        "at": timestamp.isoformat(),
+        "date": local_timestamp.date().isoformat(),
+        "time": local_timestamp.strftime("%H:%M:%S"),
+        "device": resolved_device,
+        "page": canonicalize_page_path(page),
+    }
 
 
 def canonicalize_page_path(page: str | None) -> str:
@@ -409,27 +271,17 @@ def format_visit_date_label(local_date: date) -> str:
     return f"{local_date.day:02d} {month_label}"
 
 
-def format_visit_origin_label(source: str, referrer_domain: str) -> str:
-    normalized_source = normalize_source(source)
-    if normalized_source not in {"direct", "link"}:
-        return SOURCE_DISPLAY_LABELS.get(
-            normalized_source,
-            normalized_source.replace("_", " ").strip().title() or "Directo",
-        )
-
-    cleaned_domain = str(referrer_domain or "").strip().lower()
-    if cleaned_domain:
-        inferred_domain_source = infer_source_from_domain(cleaned_domain)
-        if inferred_domain_source and inferred_domain_source not in {"direct", "link"}:
-            return SOURCE_DISPLAY_LABELS.get(
-                inferred_domain_source,
-                inferred_domain_source.replace("_", " ").strip().title(),
-            )
-        return normalize_domain_label(cleaned_domain)
-
-    return SOURCE_DISPLAY_LABELS.get(
-        normalized_source,
-        normalized_source.replace("_", " ").strip().title() or "Directo",
+def build_visit_device_timeline(
+    visit_events: list[dict[str, object]],
+    *,
+    bucket_limit: int = 10,
+    series_limit: int = 4,
+) -> dict:
+    return build_visit_timeline(
+        visit_events,
+        label_resolver=lambda event: format_visit_device_label(str(event.get("device") or "")),
+        bucket_limit=bucket_limit,
+        series_limit=series_limit,
     )
 
 
@@ -520,23 +372,6 @@ def build_visit_timeline(
     }
 
 
-def build_visit_origin_timeline(
-    visit_events: list[dict[str, object]],
-    *,
-    bucket_limit: int = 10,
-    series_limit: int = 4,
-) -> dict:
-    return build_visit_timeline(
-        visit_events,
-        label_resolver=lambda event: format_visit_origin_label(
-            str(event.get("source") or "direct"),
-            str(event.get("referrer_domain") or ""),
-        ),
-        bucket_limit=bucket_limit,
-        series_limit=series_limit,
-    )
-
-
 def load_visit_stats() -> None:
     global VISITS_TOTAL
 
@@ -545,8 +380,7 @@ def load_visit_stats() -> None:
 
     with VISITS_LOCK:
         VISITS_TOTAL = 0
-        VISITS_BY_SOURCE.clear()
-        VISITS_BY_REFERRER.clear()
+        VISITS_BY_DEVICE.clear()
         VISITS_BY_PAGE.clear()
         VISIT_EVENTS.clear()
 
@@ -561,23 +395,18 @@ def load_visit_stats() -> None:
                 except json.JSONDecodeError:
                     continue
 
-                source = normalize_source(str(event.get("source") or "direct"))
                 page = canonicalize_page_path(str(event.get("page") or "/"))
-                referrer_domain = str(event.get("referrer_domain") or "").strip().lower()
+                normalized_event = build_visit_event(
+                    page=page,
+                    observed_at=parse_visit_timestamp(str(event.get("at") or "")),
+                    device=str(event.get("device") or ""),
+                    user_agent=str(event.get("user_agent") or ""),
+                )
 
                 VISITS_TOTAL += 1
-                VISITS_BY_SOURCE[source] += 1
+                VISITS_BY_DEVICE[normalized_event["device"]] += 1
                 VISITS_BY_PAGE[page] += 1
-                if referrer_domain:
-                    VISITS_BY_REFERRER[referrer_domain] += 1
-                VISIT_EVENTS.append(
-                    {
-                        "at": str(event.get("at") or ""),
-                        "page": page,
-                        "source": source,
-                        "referrer_domain": referrer_domain,
-                    }
-                )
+                VISIT_EVENTS.append(normalized_event)
 
 
 def get_visits_snapshot() -> dict:
@@ -596,9 +425,10 @@ def get_visits_snapshot() -> dict:
     project_events = [
         {
             "at": str(event.get("at") or ""),
+            "date": str(event.get("date") or ""),
+            "time": str(event.get("time") or ""),
             "page": canonicalize_page_path(str(event.get("page") or "/")),
-            "source": normalize_source(str(event.get("source") or "direct")),
-            "referrer_domain": str(event.get("referrer_domain") or "").strip().lower(),
+            "device": normalize_device_category(str(event.get("device") or "")),
         }
         for event in visit_events
         if is_project_page_path(str(event.get("page") or "/"))
@@ -618,32 +448,26 @@ def get_visits_snapshot() -> dict:
         filtered_project_events.append(event)
 
     total_visits = len(filtered_project_events)
-    by_source_counter: Counter[str] = Counter()
+    by_device_counter: Counter[str] = Counter()
     by_page_counter: Counter[str] = Counter()
-    by_referrer_counter: Counter[str] = Counter()
 
     for event in filtered_project_events:
-        by_source_counter[str(event["source"])] += 1
+        by_device_counter[str(event["device"])] += 1
         by_page_counter[str(event["page"])] += 1
-        referrer_domain = str(event["referrer_domain"])
-        if referrer_domain:
-            by_referrer_counter[referrer_domain] += 1
 
     top_pages = [
         {"path": page, "label": get_page_label(page), "count": total}
         for page, total in by_page_counter.most_common(12)
     ]
-    top_referrers = [
-        {"domain": domain, "count": total}
-        for domain, total in by_referrer_counter.most_common(10)
-    ]
 
     return {
         "total": total_visits,
-        "by_source": {source: total for source, total in by_source_counter.most_common()},
+        "by_device": {
+            format_visit_device_label(device): total
+            for device, total in by_device_counter.most_common()
+        },
         "top_pages": top_pages,
-        "top_referrers": top_referrers,
-        "origin_timeline": build_visit_origin_timeline(filtered_project_events, bucket_limit=10),
+        "device_timeline": build_visit_device_timeline(filtered_project_events, bucket_limit=10),
         "page_timeline": build_visit_timeline(
             filtered_project_events,
             label_resolver=lambda event: str(
@@ -667,31 +491,10 @@ def record_visit(page: str) -> None:
     global VISITS_TOTAL
 
     page = canonicalize_page_path(page)
-
-    explicit_source = extract_explicit_source()
-    referrer = request.headers.get("Referer", "")
-    user_agent = request.headers.get("User-Agent", "")
-    requested_with = request.headers.get("X-Requested-With", "")
-    sec_fetch_site = request.headers.get("Sec-Fetch-Site", "")
-    request_host = request.host.split(":", 1)[0].lower() if request.host else ""
-    referrer_domain = extract_referrer_domain(referrer)
-    source = infer_source(
-        current_host=request_host,
-        explicit_source=explicit_source,
-        referrer_domain=referrer_domain,
-        user_agent=user_agent,
-        requested_with=requested_with,
-        sec_fetch_site=sec_fetch_site,
+    event = build_visit_event(
+        page=page,
+        user_agent=request.headers.get("User-Agent", ""),
     )
-
-    event = {
-        "at": utc_now_iso(),
-        "page": page,
-        "source": source,
-        "utm_source": explicit_source or None,
-        "referrer_domain": referrer_domain or None,
-        "user_agent": user_agent[:180],
-    }
 
     try:
         with VISITS_LOCK:
@@ -699,32 +502,24 @@ def record_visit(page: str) -> None:
                 handle.write(f"{json.dumps(event, ensure_ascii=True)}\n")
 
             VISITS_TOTAL += 1
-            VISITS_BY_SOURCE[source] += 1
+            VISITS_BY_DEVICE[event["device"]] += 1
             VISITS_BY_PAGE[page] += 1
-            if referrer_domain:
-                VISITS_BY_REFERRER[referrer_domain] += 1
-            VISIT_EVENTS.append(
-                {
-                    "at": event["at"],
-                    "page": page,
-                    "source": source,
-                    "referrer_domain": referrer_domain,
-                }
-            )
+            VISIT_EVENTS.append(event.copy())
 
             total_visits = VISITS_TOTAL
-            source_total = VISITS_BY_SOURCE[source]
+            device_total = VISITS_BY_DEVICE[event["device"]]
     except OSError:
         app.logger.exception("Could not write visit analytics to %s", VISITS_LOG_FILE)
         return
 
     app.logger.info(
-        "[visit] total=%s source=%s source_total=%s page=%s referrer=%s",
+        "[visit] total=%s device=%s device_total=%s page=%s date=%s time=%s",
         total_visits,
-        source,
-        source_total,
+        event["device"],
+        device_total,
         page,
-        referrer_domain or "-",
+        event["date"],
+        event["time"],
     )
 
 
@@ -1209,6 +1004,7 @@ def project_visits():
 def health_check():
     return jsonify({
         "status": "ok",
+        "version": APP_VERSION,
         "instance_id": SERVER_INSTANCE_ID,
         "started_at": SERVER_STARTED_AT,
         "timestamp": utc_now_iso(),

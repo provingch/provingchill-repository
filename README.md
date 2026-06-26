@@ -54,8 +54,8 @@ El backend no crea esas carpetas: las preparás vos en el servidor y reiniciás 
 - Catálogo de proyectos en `/projects`.
 - Publicación estática por carpeta en `/pages/<slug>/`.
 - Changelog público por proyecto en `/projects/<slug>/changelog`.
-- Registro de visitas en `analytics/visits.jsonl` con origen (`instagram`, `discord`, `link`, `direct`, etc.).
-- Las visitas `internal` (navegación dentro del mismo dominio) no cuentan en estadísticas.
+- Registro de visitas en `analytics/visits.jsonl` con datos mínimos: fecha, hora, tipo de dispositivo y página visitada.
+- No se guardan referrer, IP, user-agent completo ni parámetros UTM.
 - Detección de favicon y color dominante por proyecto (requiere `Pillow`).
 
 ## API y rutas
@@ -67,17 +67,23 @@ El backend no crea esas carpetas: las preparás vos en el servidor y reiniciás 
 - `GET /projects/<slug>/changelog` — changelog del proyecto
 - `GET /media/<archivo>` — media del portal
 - `GET /api/pages` — proyectos detectados (slug, categoría, versión, favicon, visitas)
-- `GET /api/visits` — resumen de visitas a proyectos
+- `GET /api/visits` — resumen agregado de visitas (totales, dispositivos, proyectos)
 - `GET /health` — healthcheck
 
-## Medir origen recomendado
+## Analytics
 
-- Instagram: `https://tu-dominio.com/?utm_source=instagram`
-- Discord: `https://tu-dominio.com/?utm_source=discord`
-- WhatsApp: `https://tu-dominio.com/?utm_source=whatsapp`
-- Genérico: `https://tu-dominio.com/?utm_source=link`
+Cada visita guarda solo:
 
-También acepta `source`, `via`, `platform` y `ref_source` como alias de `utm_source`.
+```json
+{
+  "date": "2026-06-26",
+  "time": "20:43:17",
+  "device": "desktop",
+  "page": "/pages/mi-proyecto/"
+}
+```
+
+`device` puede ser `desktop`, `mobile`, `tablet` o `desconocido`. El campo `page` se usa solo para contar vistas por proyecto; no identifica a la persona.
 
 ## Estructura del repo
 
