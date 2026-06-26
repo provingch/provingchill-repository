@@ -4,7 +4,7 @@ Todos los cambios relevantes de este repositorio se documentan acá.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto usa versionado aproximado por releases.
 
-## [Unreleased]
+## [4.0.0] 26-06-2026
 
 ### Changed
 
