@@ -8,46 +8,34 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Syne:wght@600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Inter:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   </head>
-  <body
-    data-authenticated="{{ '1' if auth_user else '0' }}"
-    data-username="{{ auth_user.username if auth_user else '' }}"
-    data-role="{{ auth_user.role if auth_user else '' }}"
-    data-page="project-changelog"
-  >
+  <body data-page="project-changelog">
     <div class="bg-noise" aria-hidden="true"></div>
-    <div class="bg-shape bg-shape-a" aria-hidden="true"></div>
-    <div class="bg-shape bg-shape-b" aria-hidden="true"></div>
-    {% set flash_messages = get_flashed_messages(with_categories=true) %}
-    {% set auth_jump_href = page.url %}
-    {% set auth_jump_label = 'Abrir proyecto' %}
-    {% set auth_return_path = request.path %}
+
     {% include "_site_nav.html" %}
 
+    {% set banner_eyebrow = "Historial del proyecto" %}
+    {% set banner_title = page.title %}
+    {% set banner_sub %}
+      {% if page.version %}
+        Versión actual: <strong>{{ page.version }}</strong>
+      {% else %}
+        Todavía no tiene una versión publicada.
+      {% endif %}
+    {% endset %}
+    {% include "_page_banner.html" %}
+
     <main class="wrapper changelog-shell">
-      <section class="panel changelog-hero">
-        <p class="changelog-kicker">Historial del proyecto</p>
-        <div class="changelog-hero-head">
-          <div>
-            <h1>{{ page.title }}</h1>
-            <p class="changelog-subtitle">
-              {% if page.version %}
-                Version actual: <strong>{{ page.version }}</strong>
-              {% else %}
-                Todavia no tiene una version publicada.
-              {% endif %}
-            </p>
-          </div>
-          <div class="changelog-actions">
-            <a class="page-action-link page-action-primary" href="{{ page.url }}">Abrir proyecto</a>
-            <a class="page-action-link" href="{{ url_for('projects_page') }}">Volver a proyectos</a>
-          </div>
+      <section class="changelog-toolbar">
+        <div class="changelog-actions">
+          <a class="page-action-link page-action-primary" href="{{ page.url }}">Abrir proyecto</a>
+          <a class="page-action-link" href="{{ url_for('projects_page') }}">Volver a proyectos</a>
         </div>
-        <div class="page-meta">
+        <div class="page-meta changelog-meta">
           <span class="page-meta-pill">{{ page.visit_count or 0 }} vistas</span>
           {% if changelog.source_file %}
           <span class="page-meta-pill">Fuente: {{ changelog.source_file }}</span>
@@ -55,7 +43,7 @@
         </div>
       </section>
 
-      <section class="panel changelog-board">
+      <section class="changelog-board">
         {% if changelog.entries %}
           <div class="changelog-entry-list">
             {% for entry in changelog.entries %}
@@ -83,19 +71,17 @@
           <pre class="changelog-raw">{{ changelog.raw_text }}</pre>
         {% else %}
           <div class="changelog-empty">
-            <h2>Aun no hay changelog</h2>
+            <h2>Aún no hay changelog</h2>
             <p>
-              Puedes crear un `changelog.json`, `CHANGELOG.md` o un archivo `version.txt`
-              dentro de la carpeta del proyecto para mostrar versiones y cambios aqui.
+              Puedes crear un <code>changelog.json</code>, <code>CHANGELOG.md</code> o un
+              archivo <code>version.txt</code> dentro de la carpeta del proyecto para
+              mostrar versiones y cambios aquí.
             </p>
           </div>
         {% endif %}
       </section>
     </main>
 
-    <script>
-      window.__APP_CONTEXT__ = {{ {"authenticated": auth_user is not none, "user": auth_user if auth_user else None, "timezone": app_timezone_name}|tojson }};
-    </script>
-    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+    {% include "_site_scripts.html" %}
   </body>
 </html>

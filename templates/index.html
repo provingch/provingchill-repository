@@ -8,354 +8,120 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Syne:wght@600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Inter:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
-    <style>
-      /* ── Home-specific extras ── */
-
-      /* Stat overview */
-      .stat-row {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 0.75rem;
-        margin-top: 1rem;
-      }
-
-      .stat-card {
-        border: 1px solid var(--line-soft);
-        border-radius: 1rem;
-        background: var(--bg-card-strong);
-        padding: 1rem 1.1rem;
-        display: grid;
-        gap: 0.25rem;
-      }
-
-      .stat-value {
-        font-family: "Syne", sans-serif;
-        font-size: clamp(1.9rem, 4vw, 2.6rem);
-        font-weight: 800;
-        line-height: 1;
-        color: #f5f7fb;
-      }
-
-      .stat-label {
-        font-size: 0.78rem;
-        font-weight: 700;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--muted);
-      }
-
-      .stat-card.accent-cyan .stat-value { color: var(--cyan); }
-      .stat-card.accent-pink .stat-value  { color: var(--pink); }
-      .stat-card.accent-gold .stat-value  { color: var(--gold); }
-
-      /* Tech chips */
-      .tech-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.45rem;
-        margin-top: 0.8rem;
-      }
-
-      .tech-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        padding: 0.3rem 0.72rem;
-        border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.1);
-        background: rgba(255,255,255,0.04);
-        color: #c8d0de;
-        font-size: 0.78rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-      }
-
-      .tech-chip-dot {
-        width: 0.45rem;
-        height: 0.45rem;
-        border-radius: 999px;
-        flex-shrink: 0;
-      }
-
-      /* Social links */
-      .social-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.55rem;
-        margin-top: 1rem;
-      }
-
-      .social-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.45rem;
-        padding: 0.48rem 0.82rem;
-        border-radius: 0.75rem;
-        border: 1px solid rgba(255,255,255,0.12);
-        background: rgba(255,255,255,0.03);
-        color: #c8d0de;
-        text-decoration: none;
-        font-size: 0.84rem;
-        font-weight: 700;
-        transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, color 150ms ease;
-      }
-
-      .social-link:hover {
-        transform: translateY(-1px);
-        border-color: rgba(255,255,255,0.22);
-        background: rgba(255,255,255,0.08);
-        color: #fff;
-      }
-
-      .social-link svg {
-        width: 1rem;
-        height: 1rem;
-        fill: currentColor;
-        flex-shrink: 0;
-      }
-
-      /* Divider */
-      .panel-divider {
-        height: 1px;
-        background: var(--line-soft);
-        margin: 1rem 0;
-      }
-
-      /* Projects section */
-      .projects-section {
-        padding-bottom: 2.8rem;
-      }
-
-      .projects-section .full {
-        padding: 1.25rem;
-      }
-
-      .page-item-empty {
-        padding: 2rem;
-        text-align: center;
-        border: 1px dashed rgba(255,255,255,0.1);
-        border-radius: 1rem;
-        color: var(--muted);
-        font-size: 0.92rem;
-      }
-
-      /* Activity pulse dot */
-      .pulse-dot {
-        width: 0.55rem;
-        height: 0.55rem;
-        border-radius: 999px;
-        background: var(--success);
-        display: inline-block;
-        box-shadow: 0 0 0 0 rgba(142,240,189,0.5);
-        animation: pulse-ring 2s ease-out infinite;
-      }
-
-      @keyframes pulse-ring {
-        0%   { box-shadow: 0 0 0 0 rgba(142,240,189,0.45); }
-        70%  { box-shadow: 0 0 0 6px rgba(142,240,189,0); }
-        100% { box-shadow: 0 0 0 0 rgba(142,240,189,0); }
-      }
-
-      /* Responsive */
-      @media (max-width: 820px) {
-        .home-two-col {
-          grid-template-columns: 1fr !important;
-        }
-        .stat-row {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-      }
-
-      @media (max-width: 480px) {
-        .stat-row {
-          grid-template-columns: 1fr;
-        }
-      }
-    </style>
   </head>
-  <body
-    data-authenticated="{{ '1' if auth_user else '0' }}"
-    data-username="{{ auth_user.username if auth_user else '' }}"
-    data-role="{{ auth_user.role if auth_user else '' }}"
-    data-page="home"
-  >
+  <body data-page="home">
     <div class="bg-noise" aria-hidden="true"></div>
-    <div class="bg-shape bg-shape-a" aria-hidden="true"></div>
-    <div class="bg-shape bg-shape-b" aria-hidden="true"></div>
 
-    {% set flash_messages = get_flashed_messages(with_categories=true) %}
-    {% set auth_jump_href = url_for('projects_page') %}
-    {% set auth_jump_label = 'Ir a proyectos' %}
-    {% set auth_return_path = request.path %}
     {% include "_site_nav.html" %}
 
-    <!-- HERO -->
-    <header class="wrapper hero" id="inicio" data-nav-section>
-      <div class="hero-main panel">
-        <p class="eyebrow">PORTAL PERSONAL</p>
-        <div class="hero-brand">
-          <span class="hero-brand-mark" aria-hidden="true">
-            <img src="{{ url_for('serve_media', filename='favicon.png') }}" alt="" />
-          </span>
-          <div class="hero-brand-copy">
-            <h1>ProvingChill</h1>
-            <div class="hero-copy-flow">
-              <p class="lead">
-                Subo proyectos, ideas random y experimentos cuando tengo tiempo libre. Si llegaste
-                hasta acá, gracias por darte una vuelta.
-              </p>
-              <p class="hero-copy-detail">
-                Este espacio es mi vitrina: páginas, automatizaciones, utilidades y otros
-                inventos. Casi siempre son proyectos que nacen de curiosidad y se van puliendo
-                sobre la marcha.
-              </p>
-            </div>
-            <div class="hero-actions" style="margin-top:1.1rem;">
-              <a href="{{ url_for('projects_page') }}" class="btn">Ver proyectos</a>
-              <a href="{{ url_for('monitor_page') }}" class="btn btn-ghost">Ver monitor</a>
-            </div>
-          </div>
-        </div>
+    {% set banner_id = "inicio" %}
+    {% set banner_nav = true %}
+    {% set banner_eyebrow = "Portal personal — provingggg" %}
+    {% set banner_title %}Proving <em>Chill</em>{% endset %}
+    {% set banner_reveal = true %}
+    {% set banner_typewriter_phrases = [
+      "esta es la mejor feature que implemente probablemente",
+      "alguien lee esto de verdad?",
+      "no me gusta este banner",
+      "hola mundo",
+      "aqui escribo cosas",
+      "que mas puedo escribir?"
+    ] %}
+    {% set banner_extra %}
+      <div class="page-banner-actions reveal">
+        <a href="{{ url_for('projects_page') }}" class="btn btn-primary">Ver proyectos</a>
+        <a href="#sobre-mi" class="btn btn-ghost">Quién soy</a>
       </div>
-    </header>
+    {% endset %}
+    {% include "_page_banner.html" %}
 
-    <!-- MAIN CONTENT -->
-    <main class="wrapper" style="padding-bottom:2.8rem;">
-
-      <!-- Two-column: About + Stats -->
-      <div class="home-two-col">
-
-        <!-- About panel -->
-        <section class="panel home-section" id="sobre-mi" data-nav-section>
-          <p class="eyebrow home-eyebrow">SOBRE MÍ</p>
-          <h2 class="home-title">
-            Quién soy
-          </h2>
-          <p class="home-p">
-            Desarrollador independiente con ganas de construir cosas útiles (y a veces inútiles).
-            Mezclo backend, automatización y un poco de diseño para ver hasta dónde llega cada
-            idea. Sin fórmulas fijas, sin garantías de calidad garantizada.
+    <!-- STATS + CONTENT — columnas alineadas -->
+    <section class="home-dashboard wrapper">
+      <div class="home-col">
+        <div class="home-stat">
+          <span class="stat-num">{{ pages|length }}</span>
+          <span class="stat-lbl">Proyectos publicados</span>
+        </div>
+        <div class="home-panel">
+          <p class="kicker">Sobre mí</p>
+          <h2 class="block-title" id="sobre-mi">Quién soy</h2>
+          <p class="block-body">
+            Dev independiente. Mezclo backend, automatización y diseño para ver
+            hasta dónde llega cada idea. Sin fórmulas fijas, sin garantías de
+            calidad garantizada.
           </p>
 
-          <div class="panel-divider"></div>
+          <hr class="rule" />
 
-          <p class="eyebrow home-eyebrow-sm">STACK HABITUAL</p>
-          <div class="tech-chips">
-            <span class="tech-chip">
-              <span class="tech-chip-dot" style="background:var(--cyan);"></span>Python
-            </span>
-            <span class="tech-chip">
-              <span class="tech-chip-dot" style="background:var(--gold);"></span>JavaScript
-            </span>
-            <span class="tech-chip">
-              <span class="tech-chip-dot" style="background:var(--pink);"></span>Flask
-            </span>
-            <span class="tech-chip">
-              <span class="tech-chip-dot" style="background:#a78bfa;"></span>SQL
-            </span>
-            <span class="tech-chip">
-              <span class="tech-chip-dot" style="background:var(--success);"></span>Linux
-            </span>
-            <span class="tech-chip">
-              <span class="tech-chip-dot" style="background:#f97316;"></span>Docker
-            </span>
+          <p class="kicker">Stack</p>
+          <div class="stack-list">
+            <span class="stack-chip">Python</span>
+            <span class="stack-chip">JavaScript</span>
+            <span class="stack-chip">Flask</span>
+            <span class="stack-chip">SQL</span>
+            <span class="stack-chip">Linux</span>
+            <span class="stack-chip">Docker</span>
           </div>
 
-          <div class="panel-divider"></div>
+          <hr class="rule" />
 
-          <p class="eyebrow home-eyebrow-sm">ENCONTRAME EN</p>
-          <div class="social-row">
+          <p class="kicker">Redes</p>
+          <div class="social-list">
             <a href="https://github.com/provingch" target="_blank" rel="noopener" class="social-link">
-              <!-- GitHub icon -->
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2Z"/></svg>
+              <svg viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2Z"/></svg>
               GitHub
             </a>
             <a href="https://x.com/provingchill" target="_blank" rel="noopener" class="social-link">
-              <!-- X/Twitter icon -->
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+              <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
               Twitter / X
             </a>
           </div>
-        </section>
+        </div>
+      </div>
 
-        <!-- Stats + activity panel -->
-        <section class="panel home-section" id="stats" data-nav-section>
-          <p class="eyebrow home-eyebrow">ACTIVIDAD</p>
-
-          <div class="section-header">
-            <h2 class="home-title">
-              Resumen de proyectos
-            </h2>
-            <span style="display:inline-flex;align-items:center;gap:0.45rem;color:var(--success);font-size:0.82rem;font-weight:700;">
-              <span class="pulse-dot"></span> En línea
-            </span>
-          </div>
-
-          <div class="stat-row">
-            <div class="stat-card accent-cyan">
-              <span class="stat-value">{{ pages|length }}</span>
-              <span class="stat-label">Proyectos</span>
-            </div>
-            <div class="stat-card accent-pink">
-              <span class="stat-value">{{ project_views }}</span>
-              <span class="stat-label">Vistas de proyectos</span>
-            </div>
-            <div class="stat-card accent-gold">
-              <span class="stat-value">{{ total_likes }}</span>
-              <span class="stat-label">Likes totales</span>
-            </div>
-          </div>
-
-          <div class="panel-divider"></div>
-
-          <p class="eyebrow home-eyebrow-md">PROYECTOS DESTACADOS</p>
+      <div class="home-col">
+        <div class="home-stat">
+          <span class="stat-num">{{ project_views }}</span>
+          <span class="stat-lbl">Vistas totales</span>
+        </div>
+        <div class="home-panel">
+          <p class="kicker">Destacados</p>
+          <h2 class="block-title">Catálogo</h2>
 
           {% if featured_pages %}
-            <div style="display:grid;gap:0.6rem;">
-              {% for page in featured_pages %}
-              <a href="{{ page.url or '#' }}" class="home-page-item">
-                <span class="home-page-item-title">
-                  {{ page.title }}
-                </span>
-                <span class="home-page-item-meta">
-                  {{ page.like_count or 0 }} likes · {{ page.visit_count or 0 }} vistas
-                </span>
-              </a>
-              {% endfor %}
-            </div>
+          <div class="index-list">
+            {% for page in featured_pages %}
+            <a href="{{ page.url or '#' }}" class="index-row">
+              <span class="index-num">{{ '%02d'|format(loop.index) }}</span>
+              <span class="index-name">{{ page.title }}</span>
+              <span class="index-fill" aria-hidden="true"></span>
+              <span class="index-meta">{{ page.visit_count or 0 }} vistas</span>
+            </a>
+            {% endfor %}
+          </div>
           {% else %}
-            <p class="home-empty-inline">Todavía no hay proyectos cargados.</p>
+          <p class="index-empty">Todavía no hay proyectos cargados.</p>
           {% endif %}
 
           {% if pages|length > 3 %}
-          <div class="home-view-all">
-            <a href="{{ url_for('projects_page') }}" class="btn btn-ghost" style="font-size:0.84rem;padding:0.55rem 0.9rem;">
-              Ver todos los proyectos →
+          <div class="index-more">
+            <a href="{{ url_for('projects_page') }}" class="btn btn-ghost">
+              Ver todos ({{ pages|length }}) →
             </a>
           </div>
           {% endif %}
-        </section>
-
+        </div>
       </div>
+    </section>
 
-    </main>
+    <footer class="footer wrapper">
+      PROVINGGGG · {{ pages|length }} PROYECTOS PUBLICADOS
+    </footer>
 
-    <script>
-      window.__APP_CONTEXT__ = {{ {
-        "authenticated": auth_user is not none,
-        "user": {"username": auth_user.username, "role": auth_user.role} if auth_user else none,
-        "timezone": app_timezone_name
-      }|tojson }};
-    </script>
-    <script
-      src="https://cdn.socket.io/4.7.5/socket.io.min.js"
-      crossorigin="anonymous"
-      defer
-    ></script>
-    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+    {% include "_site_scripts.html" %}
   </body>
 </html>

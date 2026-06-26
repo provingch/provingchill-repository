@@ -1,0 +1,31 @@
+<section
+  class="page-banner wrapper{% if banner_class %} {{ banner_class }}{% endif %}"
+  {% if banner_id %}id="{{ banner_id }}"{% endif %}
+  {% if banner_nav %}data-nav-section{% endif %}
+>
+  <div class="page-banner-inner">
+    <div class="page-banner-copy">
+      {% if banner_eyebrow %}
+      <p class="kicker{% if banner_reveal %} reveal{% endif %}">{{ banner_eyebrow }}</p>
+      {% endif %}
+      <h1 class="page-banner-title{% if banner_reveal %} reveal{% endif %}">{{ banner_title|safe }}</h1>
+      {% if banner_typewriter_phrases is defined and banner_typewriter_phrases %}
+      <p
+        class="page-banner-sub page-banner-typewriter{% if banner_reveal %} reveal{% endif %}"
+        data-typewriter-phrases='{{ banner_typewriter_phrases|tojson }}'
+        aria-live="polite"
+      >
+        <span class="typewriter-text"></span><span class="typewriter-cursor" aria-hidden="true"></span>
+      </p>
+      {% elif banner_sub %}
+      <p class="page-banner-sub{% if banner_reveal %} reveal{% endif %}">{{ banner_sub|safe }}</p>
+      {% endif %}
+      {% if banner_extra is defined %}{{ banner_extra }}{% endif %}
+    </div>
+    <div class="page-banner-seal-wrap">
+      <div class="page-banner-seal-glow" aria-hidden="true"></div>
+      <div class="page-banner-seal-ring" aria-hidden="true"></div>
+      <div id="hero-seal" class="page-banner-seal" aria-hidden="true"></div>
+    </div>
+  </div>
+</section>

@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Syne:wght@600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Inter:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
@@ -20,22 +20,21 @@
     data-page="analytics"
   >
     <div class="bg-noise" aria-hidden="true"></div>
-    <div class="bg-shape bg-shape-a" aria-hidden="true"></div>
-    <div class="bg-shape bg-shape-b" aria-hidden="true"></div>
     {% set flash_messages = get_flashed_messages(with_categories=true) %}
     {% set auth_jump_href = url_for('projects_page') %}
     {% set auth_jump_label = 'Ir a proyectos' %}
     {% set auth_return_path = request.path %}
     {% include "_site_nav.html" %}
 
-    <main class="wrapper chat-page-shell">
-      <section class="panel analytics" id="estadisticas" data-nav-section>
-        <div class="section-header">
-          <div>
-            <p class="chart-kicker">Lectura del trafico</p>
-            <h1>Vistas de proyectos en planos cartesianos</h1>
-          </div>
-        </div>
+    {% set banner_id = "estadisticas" %}
+    {% set banner_nav = true %}
+    {% set banner_eyebrow = "Lectura del tráfico" %}
+    {% set banner_title = "Analytics" %}
+    {% set banner_sub = "Vistas de proyectos en planos cartesianos." %}
+    {% include "_page_banner.html" %}
+
+    <main class="wrapper analytics-shell">
+      <section class="panel analytics">
         <div id="status" class="status" aria-live="polite"></div>
 
         <div class="analytics-stack">
@@ -66,6 +65,8 @@
       </section>
     </main>
 
+    <footer class="footer wrapper">PROVINGGGG · ANALYTICS</footer>
+
     <script>
       window.__APP_CONTEXT__ = {{ {"authenticated": auth_user is not none, "user": auth_user if auth_user else None, "timezone": app_timezone_name}|tojson }};
     </script>
@@ -74,6 +75,7 @@
       crossorigin="anonymous"
       defer
     ></script>
+    {% include "_site_scripts.html" %}
     <script src="{{ url_for('static', filename='app.js') }}" defer></script>
   </body>
 </html>

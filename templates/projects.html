@@ -3,56 +3,39 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Proyectos - ProvingChill</title>
+    <title>Proyectos · ProvingChill</title>
     <link rel="icon" type="image/png" href="{{ url_for('serve_media', filename='favicon.png') }}" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Syne:wght@600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Inter:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   </head>
-  <body
-    data-authenticated="{{ '1' if auth_user else '0' }}"
-    data-username="{{ auth_user.username if auth_user else '' }}"
-    data-role="{{ auth_user.role if auth_user else '' }}"
-    data-page="projects"
-  >
+  <body data-page="projects">
     <div class="bg-noise" aria-hidden="true"></div>
-    <div class="bg-shape bg-shape-a" aria-hidden="true"></div>
-    <div class="bg-shape bg-shape-b" aria-hidden="true"></div>
-    {% set flash_messages = get_flashed_messages(with_categories=true) %}
-    {% set auth_jump_href = '#proyectos' %}
-    {% set auth_jump_label = 'Ir a proyectos' %}
-    {% set auth_return_path = request.path %}
+
     {% include "_site_nav.html" %}
 
-    <main class="wrapper layout">
-      <section class="panel full" id="proyectos" data-nav-section>
-        <div class="list-header">
-          <div class="list-header-copy">
-            <h1>Proyectos publicados</h1>
-            <p>
-              Vistas, likes y changelogs viven alrededor de cada proyecto. Las carpetas siguen
-              separadas entre paginas musicales y paginas interactivas.
-            </p>
-          </div>
-        </div>
-        <div id="status" class="status" aria-live="polite"></div>
-        <div id="empty-state" class="empty-state">Aún no hay proyectos detectados.</div>
-        <div id="pages-list" class="pages-list"></div>
-      </section>
+    {% set banner_id = "proyectos" %}
+    {% set banner_nav = true %}
+    {% set banner_eyebrow = "Catálogo completo" %}
+    {% set banner_title = "Proyectos publicados" %}
+    {% set banner_sub = "Vistas y changelogs viven junto a cada proyecto. Las carpetas siguen separadas entre páginas musicales y páginas interactivas." %}
+    {% set banner_extra %}
+      <div id="status" class="status" aria-live="polite"></div>
+    {% endset %}
+    {% include "_page_banner.html" %}
+
+    <main class="wrapper">
+      <div id="empty-state" class="empty-state">Aún no hay proyectos detectados.</div>
+      <div id="pages-list"></div>
     </main>
 
-    <script>
-      window.__APP_CONTEXT__ = {{ {"authenticated": auth_user is not none, "user": auth_user if auth_user else None, "timezone": app_timezone_name}|tojson }};
-    </script>
-    <script
-      src="https://cdn.socket.io/4.7.5/socket.io.min.js"
-      crossorigin="anonymous"
-      defer
-    ></script>
+    <footer class="footer wrapper">PROVINGGGG · CATÁLOGO DE PROYECTOS</footer>
+
+    {% include "_site_scripts.html" %}
     <script src="{{ url_for('static', filename='app.js') }}" defer></script>
   </body>
 </html>
